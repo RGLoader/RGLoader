@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<xex>
+	<gameregion system=""/>
+     
+	<format>
+		<compressed/>
+	</format>
+     
+	<exportcontainer name="RGLoader.xex"/>
+     
+	<sysdll/>
+     
+	<version major="2" minor="0" build="21256" qfe="0"/>
+     
+	<mediatypes>
+		<flash/>
+    <harddisk/>
+	</mediatypes>
+     
+	<baseaddr addr="0x91800000"/>
+</xex>
