@@ -7,7 +7,6 @@
 using namespace std;
 
 #define EXPANSION_SIG 'HVPP'
-#define GET_VERSIONS_SC   0
 #define EXPANSION_INST_SC 0x70
 #define EXPANSION_CALL_SC 0x71
 #define STATUS_MEMORY_NOT_ALLOCATED ((NTSTATUS)0xC00000A0)

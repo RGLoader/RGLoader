@@ -66,9 +66,30 @@ BYTE ExpansionData[] = {
 };
 #pragma endregion
 
+#ifndef __ExpPubKey__
+#define __ExpPubKey__
+BYTE ExpPubKey[] = {
+	0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x37, 0x91, 0x13, 0x7D, 0x06, 0x04, 0x99, 0x39, 0xFD, 0xE4, 0x62, 0x4F, 0xAD, 0x8B, 0x76, 0xA4,
+	0xFA, 0x7E, 0xCA, 0x89, 0xD1, 0x48, 0x69, 0xC8, 0x6B, 0xB9, 0xC7, 0x1E, 0x4B, 0x6E, 0x13, 0x95,
+	0x71, 0xB9, 0x46, 0xA1, 0xCA, 0xF0, 0x65, 0x01, 0x64, 0xE2, 0x8C, 0x73, 0x99, 0x98, 0x97, 0xB0,
+	0xA7, 0xD5, 0xF0, 0x55, 0x04, 0x56, 0x6A, 0x77, 0x6F, 0xB3, 0x2A, 0x60, 0x34, 0xCA, 0xB7, 0x01,
+	0xE4, 0xD8, 0x67, 0x3B, 0xC2, 0x5B, 0x71, 0x20, 0xC3, 0x16, 0x98, 0xE7, 0xE7, 0x33, 0x90, 0x98,
+	0x37, 0x85, 0x1A, 0xE1, 0x82, 0x9E, 0xC4, 0xC0, 0x11, 0xEE, 0xC9, 0x34, 0xC9, 0x6F, 0x0B, 0xAE,
+	0x50, 0xA0, 0x57, 0x33, 0x49, 0x89, 0xA3, 0x1C, 0x29, 0x8A, 0xFB, 0x31, 0xF6, 0x09, 0xF3, 0xF4,
+	0x1F, 0xDF, 0x64, 0xE2, 0x22, 0x75, 0x36, 0x45, 0xBB, 0xBA, 0x69, 0x0A, 0xA0, 0x12, 0xB1, 0x83,
+	0x6F, 0x16, 0x40, 0xF1, 0x89, 0x9F, 0x4F, 0x4B, 0x87, 0x0D, 0xC1, 0x97, 0x5A, 0x85, 0xE2, 0x65,
+	0xDB, 0xE6, 0x37, 0x40, 0xAA, 0xB8, 0xC4, 0x78, 0x2D, 0xB0, 0xFC, 0xCA, 0xB2, 0xD5, 0x54, 0x81,
+	0xE2, 0x82, 0xF7, 0x3F, 0x1F, 0xCF, 0x90, 0xE4, 0xE6, 0x08, 0xFE, 0xDD, 0x3A, 0xBC, 0x28, 0xCD,
+	0x22, 0x86, 0x3B, 0x0A, 0x70, 0xE8, 0x6B, 0x74, 0x09, 0xE6, 0xED, 0x5A, 0xF3, 0xC3, 0x90, 0x35,
+	0x22, 0x43, 0x7E, 0xC3, 0x5E, 0x84, 0xC9, 0x9D, 0x5C, 0xA3, 0xE2, 0xD9, 0x69, 0xC9, 0xE4, 0x4A,
+	0x23, 0x3C, 0x47, 0xD1, 0xFD, 0x5A, 0xA5, 0x80, 0x0A, 0xD1, 0xA8, 0xE5, 0x6A, 0xC9, 0x8D, 0xDC,
+	0xFD, 0x1E, 0xEA, 0x58, 0x88, 0xC4, 0xE6, 0x5B, 0x42, 0x9F, 0x31, 0x11, 0x19, 0xC7, 0xCD, 0x32,
+	0x4C, 0xDB, 0xE5, 0x3A, 0x60, 0xA8, 0xCA, 0x85, 0xCD, 0xF6, 0x23, 0x95, 0xFE, 0xFA, 0xEA, 0x10
+};
+#endif
 
-DWORD _declspec(naked) HvxExpansionInstall(INT64 addr, DWORD size)
-{
+DWORD __declspec(naked) HvxExpansionInstall(INT64 addr, DWORD size) {
 	__asm {
 		li      r0, EXPANSION_INST_SC
 		sc
@@ -76,8 +97,7 @@ DWORD _declspec(naked) HvxExpansionInstall(INT64 addr, DWORD size)
 	}
 }
 
-QWORD __declspec(naked) HvxExpansionCall(DWORD sig, QWORD Arg1, QWORD Arg2, QWORD Arg3, QWORD Arg4)
-{
+QWORD __declspec(naked) HvxExpansionCall(DWORD sig, QWORD Arg1, QWORD Arg2, QWORD Arg3, QWORD Arg4) {
 	__asm {
 		li      r0, EXPANSION_CALL_SC
 		sc
@@ -85,36 +105,23 @@ QWORD __declspec(naked) HvxExpansionCall(DWORD sig, QWORD Arg1, QWORD Arg2, QWOR
 	}
 }
 
-QWORD __declspec(naked) HvxGetVersions(DWORD sig, QWORD arg1, QWORD arg2, QWORD arg3, QWORD arg4) {
-	__asm {
-		li      r0, GET_VERSIONS_SC
-		sc
-		blr
-	}
-}
-
-BYTE HvPeekBYTE(QWORD Address)
-{
+BYTE HvPeekBYTE(QWORD Address) {
 	return (BYTE)HvxExpansionCall(EXPANSION_SIG, PeekBYTE, Address, 0, 0);
 }
 
-WORD HvPeekWORD(QWORD Address)
-{
+WORD HvPeekWORD(QWORD Address) {
 	return (WORD)HvxExpansionCall(EXPANSION_SIG, PeekWORD, Address, 0, 0);
 }
 
-DWORD HvPeekDWORD(QWORD Address)
-{
+DWORD HvPeekDWORD(QWORD Address) {
 	return (DWORD)HvxExpansionCall(EXPANSION_SIG, PeekDWORD, Address, 0, 0);
 }
 
-QWORD HvPeekQWORD(QWORD Address)
-{
+QWORD HvPeekQWORD(QWORD Address) {
 	return HvxExpansionCall(EXPANSION_SIG, PeekQWORD, Address, 0, 0);
 }
 
-NTSTATUS HvPeekBytes(QWORD Address, PVOID Buffer, DWORD Size)
-{
+NTSTATUS HvPeekBytes(QWORD Address, PVOID Buffer, DWORD Size) {
 	NTSTATUS result = STATUS_MEMORY_NOT_ALLOCATED;
 	VOID* data = XPhysicalAlloc(Size, MAXULONG_PTR, 0, PAGE_READWRITE);
 	if (data != NULL)
@@ -131,28 +138,23 @@ NTSTATUS HvPeekBytes(QWORD Address, PVOID Buffer, DWORD Size)
 	return result;
 }
 
-NTSTATUS HvPokeBYTE(QWORD Address, BYTE Value)
-{
+NTSTATUS HvPokeBYTE(QWORD Address, BYTE Value) {
 	return (NTSTATUS)HvxExpansionCall(EXPANSION_SIG, PokeBYTE, Address, Value, 0);
 }
 
-NTSTATUS HvPokeWORD(QWORD Address, WORD Value)
-{
+NTSTATUS HvPokeWORD(QWORD Address, WORD Value) {
 	return (NTSTATUS)HvxExpansionCall(EXPANSION_SIG, PokeWORD, Address, Value, 0);
 }
 
-NTSTATUS HvPokeDWORD(QWORD Address, DWORD Value)
-{
+NTSTATUS HvPokeDWORD(QWORD Address, DWORD Value) {
 	return (NTSTATUS)HvxExpansionCall(EXPANSION_SIG, PokeDWORD, Address, Value, 0);
 }
 
-NTSTATUS HvPokeQWORD(QWORD Address, QWORD Value)
-{
+NTSTATUS HvPokeQWORD(QWORD Address, QWORD Value) {
 	return (NTSTATUS)HvxExpansionCall(EXPANSION_SIG, PokeQWORD, Address, Value, 0);
 }
 
-NTSTATUS HvPokeBytes(QWORD Address, const void* Buffer, DWORD Size)
-{
+NTSTATUS HvPokeBytes(QWORD Address, const void* Buffer, DWORD Size) {
 	NTSTATUS result = STATUS_MEMORY_NOT_ALLOCATED;
 	VOID* data = XPhysicalAlloc(Size, MAXULONG_PTR, 0, PAGE_READWRITE);
 	if (data != NULL)
@@ -167,8 +169,7 @@ NTSTATUS HvPokeBytes(QWORD Address, const void* Buffer, DWORD Size)
 	return result;
 }
 
-QWORD HvReadFuseRow(int row)
-{
+QWORD HvReadFuseRow(int row) {
 	if (row < 12)
 	{
 		QWORD addr = 0x8000020000020000ULL | (row * 0x200);
@@ -177,8 +178,7 @@ QWORD HvReadFuseRow(int row)
 	return 0;
 }
 
-DWORD InstallExpansion()
-{
+DWORD InstallExpansion() {
 	BYTE* allocData = (BYTE*)XPhysicalAlloc(0x1000, MAXULONG_PTR, 0, PAGE_READWRITE);
 	memset(allocData, 0, 0x1000);
 	memcpy(allocData, ExpansionData, sizeof(ExpansionData));
@@ -192,15 +192,15 @@ BOOL DisableExpansionInstalls() {
 	// disable expansion installs by unpatching HvxExpansionInstall
 	BYTE _30BAC_orig[]  = { 0x41, 0x9A, 0xFF, 0xB8 };  // beq cr6, LAB_00030b64
 	BYTE _30C24_orig[]  = { 0x48, 0x00, 0xB0, 0xFB };  // bla XeCryptMemDiff_0
-	BYTE _li_r3_0_blr[] = { 0x38, 0x60, 0x00, 0x00, 0x4E, 0x80, 0x00, 0x20 };  // li r3, 0; blr;
-	if (NT_SUCCESS(HvPokeBytes(0x600030BAC, _30BAC_orig, 4))) {
-		if (NT_SUCCESS(HvPokeBytes(0x600030C24, _30C24_orig, 4))) {
-			if (NT_SUCCESS(HvPokeBytes(0x600030A98, _li_r3_0_blr, 8))) {
-				DWORD ret = InstallExpansion();
-				if (ret == ERROR_SUCCESS)
-					return TRUE;
-			}
-		}
+	// BYTE _li_r3_0_blr[] = { 0x38, 0x60, 0x00, 0x00, 0x4E, 0x80, 0x00, 0x20 };  // li r3, 0; blr;
+	if (NT_SUCCESS(HvPokeBytes(0x600030BAC, _30BAC_orig, 4)) &&
+		NT_SUCCESS(HvPokeBytes(0x600030C24, _30C24_orig, 4)) &&
+		// NT_SUCCESS(HvPokeBytes(0x600030A98, _li_r3_0_blr, 8)) &&
+		NT_SUCCESS(HvPokeBytes(0x200016320, ExpPubKey, sizeof(ExpPubKey))))
+	{
+		DWORD ret = InstallExpansion();
+		if (ret == 0xC8007003)  // invalid signing key, that's what we want.
+			return TRUE;
 	}
 	return FALSE;
 }
@@ -234,8 +234,7 @@ BOOL LaunchXELL(LPCSTR path) {
 	return TRUE;
 }
 
-BOOL LoadApplyHV(const char* filepath)
-{
+BOOL LoadApplyHV(const char* filepath) {
 	DWORD fileSize = FileSize(filepath);
 	if (fileSize == -1) {
 		InfoPrint("    ERROR: Invalid HV patch path\n");
@@ -258,7 +257,7 @@ BOOL LoadApplyHV(const char* filepath)
 		UINT64 addr = *(UINT32*)patchData;
 		if (addr == 0xFFFFFFFF)
 			break;
-		addr = addr | 0x8000000000000000ULL;
+		addr |= 0x8000000000000000ULL;
 		DWORD size = *(DWORD*)(patchData + 0x4);
 		BYTE* data = (BYTE*)XPhysicalAlloc(size * 4, MAXULONG_PTR, 0, PAGE_READWRITE);
 		memcpy(data, patchData + 0x8, size*4);
@@ -273,8 +272,7 @@ BOOL LoadApplyHV(const char* filepath)
 	return TRUE;
 }
 
-BOOL LoadKeyVault(const char* filepath)
-{
+BOOL LoadKeyVault(const char* filepath) {
 	DWORD fileSize = FileSize(filepath);
 	if (fileSize == -1) {
 		InfoPrint("    ERROR: Invalid KV path\n");
