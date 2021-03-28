@@ -473,6 +473,34 @@ EX_THREAD_REGISTRATION xThreadReg = {
 	0
 }; */
 
+int BufferedSend(SOCKET sock, PBYTE buffer, DWORD size) {
+	int bLeft = size;
+	int sBytes = 0;
+	while (bLeft > 0) {
+		int tsBytes = NetDll_send(XNCALLER_SYSAPP, sock, (const char*)(buffer + sBytes), (bLeft >= 2048 ? 2048 : bLeft), 0);
+		if (tsBytes == SOCKET_ERROR) {
+			continue;
+		}
+		bLeft -= tsBytes;
+		sBytes += tsBytes;
+	}
+	return sBytes;
+}
+
+int BufferedReceive(SOCKET sock, PBYTE buffer, DWORD size) {
+	int bLeft = size;
+	int rBytes = 0;
+	while (bLeft > 0) {
+		int trBytes = NetDll_recv(XNCALLER_SYSAPP, sock, (const char*)(buffer + rBytes), (bLeft >= 2048 ? 2048 : bLeft), 0);
+		if (trBytes == SOCKET_ERROR) {
+			continue;
+		}
+		bLeft -= trBytes;
+		rBytes += trBytes;
+	}
+	return rBytes;
+}
+
 void RPCThread() {
 	WSADATA wsaData;
 	DWORD sockErr;
@@ -493,6 +521,7 @@ void RPCThread() {
 	SOCKET svrSock = NetDll_socket(XNCALLER_SYSAPP, AF_INET, SOCK_STREAM, IPPROTO_IP);
 	if (svrSock == INVALID_SOCKET) {
 		InfoPrint("NetDll_socket failed!\n");
+		WSACleanup();
 	}
 	// set sock opts
 	DWORD soVal = 5000;  // 5000 ms
@@ -506,35 +535,79 @@ void RPCThread() {
 	// bind to the port
 	if ((sockErr = NetDll_bind(XNCALLER_SYSAPP, svrSock, (SOCKADDR*)&name, sizeof(name))) != S_OK) {
 		InfoPrint("NetDll_bind failed!\n");
+		goto SvrSockDone;
 	}
 	// listen on the bound socket
 	if ((sockErr = NetDll_listen(XNCALLER_SYSAPP, svrSock, 2)) != S_OK) {
 		InfoPrint("NetDll_listen failed!\n");
+		goto SvrSockDone;
 	}
 
-	BYTE buffer[2048];
 	while (true) {
 		SOCKET cliSock = NetDll_accept(XNCALLER_SYSAPP, svrSock, NULL, NULL);
 		if (cliSock == INVALID_SOCKET) {
 			InfoPrint("NetDll_accept failed!\n");
-			break;
+			goto SvrSockDone;
 		}
-		memset(buffer, 0, 2048);
+		BYTE buffer[4] = { 0 };
 		int size = NetDll_recv(XNCALLER_SYSAPP, cliSock, (const char*)&buffer, 4, 0);
 		if (size == 4) {  // received packet size
 			DWORD pktSize = *(PDWORD)&buffer;
-			if (pktSize > 0 && pktSize <= 2044) {  // check bounds
-				size = NetDll_recv(XNCALLER_SYSAPP, cliSock, (const char*)&buffer + 4, pktSize, 0);
-				BYTE pktCmd = *(PBYTE)&buffer;
-				PBYTE pktData = ((PBYTE)&buffer) + 1;
-				if (pktCmd == 0) {
-					InfoPrint("Shutting down RPC...\n");
-					break;
+			InfoPrint("Receiving packet with size 0x%04X\n", pktSize);
+			if (pktSize > 0 && pktSize <= 0xFFFFFFFF) {  // check bounds
+				PBYTE pktBuf = (PBYTE)malloc(pktSize);
+				memset(pktBuf, 0, pktSize);
+
+				BufferedReceive(cliSock, pktBuf, pktSize);
+
+				BYTE pktCmd = *pktBuf;
+				PBYTE pktData = pktBuf + 1;
+				if (pktCmd == PeekBYTE) {  // peek BYTE
+					/* InfoPrint("Shutting down RPC...\n");
+					free(pktBuf);
+					NetDll_shutdown(XNCALLER_SYSAPP, cliSock, SD_BOTH);
+					NetDll_closesocket(XNCALLER_SYSAPP, cliSock);
+					goto SvrSockDone; */
+					QWORD peekAddr = *(PQWORD)pktData;
+					InfoPrint("Peeking BYTE @ 0x%llx...\n", peekAddr);
+					BYTE v = HvPeekBYTE(peekAddr);
+					BufferedSend(cliSock, (PBYTE)&v, sizeof(BYTE));
+				} else if (pktCmd == PeekWORD) {  // peek WORD
+					QWORD peekAddr = *(PQWORD)pktData;
+					InfoPrint("Peeking WORD @ 0x%llx...\n", peekAddr);
+					WORD v = HvPeekWORD(peekAddr);
+					BufferedSend(cliSock, (PBYTE)&v, sizeof(WORD));
+				} else if (pktCmd == PeekDWORD) {  // peek DWORD
+					QWORD peekAddr = *(PQWORD)pktData;
+					InfoPrint("Peeking DWORD @ 0x%llx...\n", peekAddr);
+					DWORD v = HvPeekDWORD(peekAddr);
+					BufferedSend(cliSock, (PBYTE)&v, sizeof(DWORD));
+				} else if (pktCmd == PeekQWORD) {  // peek QWORD
+					QWORD peekAddr = *(PQWORD)pktData;
+					InfoPrint("Peeking QWORD @ 0x%llx...\n", peekAddr);
+					QWORD v = HvPeekQWORD(peekAddr);
+					BufferedSend(cliSock, (PBYTE)&v, sizeof(QWORD));
+				} else if (pktCmd == PeekBytes) {  // peek bytes
+					QWORD peekAddr = *(PQWORD)pktData;
+					DWORD peekSize = *(PDWORD)(pktData + sizeof(QWORD));
+					InfoPrint("Peeking 0x%lx bytes(s) @ 0x%llx...\n", peekSize, peekAddr);
+					PBYTE peekBuf = (PBYTE)malloc(peekSize);
+					memset(peekBuf, 0, peekSize);
+					HvPeekBytes(peekAddr, peekBuf, peekSize);
+
+					BufferedSend(cliSock, (PBYTE)&peekSize, sizeof(DWORD));
+					BufferedSend(cliSock, peekBuf, peekSize);
+
+					free(peekBuf);
 				}
+				free(pktBuf);
+				NetDll_shutdown(XNCALLER_SYSAPP, cliSock, SD_BOTH);
+				NetDll_closesocket(XNCALLER_SYSAPP, cliSock);
 			}
 		}
 	}
 
+SvrSockDone:
 	NetDll_shutdown(XNCALLER_SYSAPP, svrSock, SD_BOTH);
 	NetDll_closesocket(XNCALLER_SYSAPP, svrSock);
 	WSACleanup();
@@ -546,6 +619,7 @@ BOOL RPCStartup() {
 	HANDLE hThread;
 	DWORD dwThread;
 	ExCreateThread(&hThread, 0, &dwThread, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)RPCThread, 0, 2);
+	SetThreadPriority(hThread, THREAD_PRIORITY_ABOVE_NORMAL);
 	XSetThreadProcessor(hThread, 4);
 	ResumeThread(hThread);
 	CloseHandle(hThread);
@@ -619,8 +693,12 @@ BOOL Initialize(HANDLE hModule) {
 	// booleans - config
 	if (!reader->GetBoolean("Config", "NoRGLP", false))
 		PatchSearchBinary();
-	if (reader->GetBoolean("Config", "RPC", false))
-		RPCStartup();
+	if (reader->GetBoolean("Config", "RPC", false)) {
+		if (fExpansionEnabled)
+			RPCStartup();
+		else
+			InfoPrint("RPC is enabled in the config but the expansion isn't installed!\n");
+	}
 	// booleans - expansion
 	if (reader->GetBoolean("Expansion", "MapUSBMass", false))
 		PatchMapUSB();
