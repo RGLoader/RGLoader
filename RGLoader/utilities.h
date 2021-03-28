@@ -72,4 +72,6 @@ QWORD FileSize(LPCSTR filename);
 bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size);
 bool WriteFile(LPCSTR filename, PVOID buffer, DWORD size);
 
+// HANDLE RGLCreateThread(LPVOID startAddr, LPVOID parameters);
+
 #endif

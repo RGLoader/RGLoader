@@ -20,6 +20,7 @@ static bool fKeepMemory = true;
 static bool fExpansionEnabled = false;
 static INIReader* reader;
 static OffsetManager offsetmanager;
+// static DWORD TitleID = 0;
 
 #define setmem(addr, data) { DWORD d = data; memcpy((LPVOID)addr, &d, 4);}
 
@@ -89,6 +90,53 @@ BOOL CPUStuff() {
 	HvPeekBytes(0x20, CPUKeyHV, 0x10);
 	HexPrint(CPUKeyHV, 0x10);
 	printf("\n");
+
+	return TRUE;
+}
+
+BOOL FuseStuff() {
+	QWORD fuselines[12];
+	for (int i = 0; i < 12; i++) {
+		fuselines[i] = HvPeekQWORD(0x8000020000020000 + (i * 0x200));
+	}
+	for (int i = 0; i < 12; i++) {
+		HexPrint((PBYTE)&fuselines[i], 8);
+		printf("\n");
+	}
+
+	return TRUE;
+}
+
+BOOL KeyVaultStuff() {
+	BYTE cpuKey[0x10] = { 0 };
+	BYTE kvBuf[0x4000] = { 0 };
+	BYTE kvHash[0x14] = { 0 };
+	PBYTE kvData = kvBuf + 0x18;
+
+	// 17489/21256.18
+	QWORD ppKvAddr = 0x2000162E0;
+	QWORD pMasterPub = 0x200011008;
+
+	QWORD pKvAddr = HvPeekQWORD(ppKvAddr);  // keyvault pointer in HV
+	// grab the CPU key and KV from the HV
+	// there's way better ways to grab the CPU key than this!
+	HvPeekBytes(0x18, cpuKey, 0x10);
+	// grab the KV
+	HvPeekBytes(pKvAddr, kvBuf, 0x4000);
+
+	// calculate the KV hash
+	XeCryptHmacSha(cpuKey, 0x10, kvData + 4, 0xD4, kvData + 0xE8, 0x1CF8, kvData + 0x1EE0, 0x2108, kvHash, 0x14);
+
+	BYTE masterPub[sizeof(XECRYPT_RSAPUB_2048)];
+	// master public key in the HV
+	HvPeekBytes(pMasterPub, masterPub, sizeof(XECRYPT_RSAPUB_2048));
+
+	InfoPrint("Console Serial: %s\n", kvBuf + 0xB0);
+
+	if (XeCryptBnDwLePkcs1Verify(kvHash, kvData + 0x1DE0, sizeof(XECRYPT_SIG)) == TRUE)
+		InfoPrint("KV hash is valid for this console!\n");
+	else
+		InfoPrint("KV hash is invalid for this console!\n");
 
 	return TRUE;
 }
@@ -283,8 +331,6 @@ NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE mo
 					printf("Failed to load signin offsets!\r\n");
 				}
 			}
-		} else {  // any other modules
-
 		}
 	}
 	return ret;
@@ -317,7 +363,7 @@ DWORD PatchApplyBinary(string filepath) {
 		DWORD numPatches = *(DWORD*)&patchData[offset];
 		offset += 4;
 		for(DWORD i = 0; i < numPatches; i++, offset += 4, dest += 4) {
-			//printf("     %08X  -> 0x%08X\n", dest, *(DWORD*)&buffer[offset]);
+			// printf("     %08X  -> 0x%08X\n", dest, *(DWORD*)&buffer[offset]);
 			setmem(dest, *(DWORD*)&patchData[offset]);
 		}
 		dest = *(DWORD*)&patchData[offset];
@@ -387,6 +433,126 @@ VOID LoadPlugins() {
 	}
 }
 
+/* VOID TitleIdChangedNotification(DWORD tid) {
+	char path[32] = { 0 };
+	sprintf(path, "Hdd:\\%04X.rglp", tid);
+
+	InfoPrint("Searching for patches for 0x%04X...\n", tid);
+
+	if (FileExists(path) == FALSE)
+		return;
+
+	DWORD npa = PatchApplyBinary(path);
+	if (npa > 0) {
+		InfoPrint("Applied %i patches for 0x%04X\n", npa, tid);
+	}
+}
+
+VOID LpThreadNotificationRoutine(PEX_THREAD_REGISTRATION pxThreadReg, PKTHREAD pThread, BOOL Creating)
+{
+	if (Creating && (pThread->CreateOptions & 0x100))
+	{
+		DWORD NewTitleID = XamGetCurrentTitleId();
+
+		if (TitleID == NewTitleID)
+			return;
+
+		TitleID = NewTitleID;
+
+		if (TitleID == 0xFFFE07D1 || TitleID == 0xFFFE07FF || TitleID == 0xF5D10000 || TitleID == 0x00000000)
+			return;
+
+		RGLCreateThread(TitleIdChangedNotification, (PVOID)TitleID);
+	}
+}
+
+EX_THREAD_REGISTRATION xThreadReg = {
+	LpThreadNotificationRoutine,
+	0,
+	0,
+	0
+}; */
+
+void RPCThread() {
+	WSADATA wsaData;
+	DWORD sockErr;
+	SOCKADDR_IN name;
+	name.sin_family = AF_INET;
+	name.sin_port = htons(10101);
+	name.sin_addr.S_un.S_addr = inet_addr("0.0.0.0");
+	// XNetStartupParams xnsp;
+
+	// startup networking
+	/* if ((sockErr = NetDll_XNetStartup(XNCALLER_SYSAPP, &xnsp)) != S_OK) {
+		InfoPrint("NetDll_XNetStartup failed!\n");
+	} */
+	if ((sockErr = NetDll_WSAStartupEx(XNCALLER_SYSAPP, MAKEWORD(2, 2), &wsaData, 2)) != S_OK) {
+		InfoPrint("NetDll_WSAStartupEx failed!\n");
+	}
+	// create socket
+	SOCKET svrSock = NetDll_socket(XNCALLER_SYSAPP, AF_INET, SOCK_STREAM, IPPROTO_IP);
+	if (svrSock == INVALID_SOCKET) {
+		InfoPrint("NetDll_socket failed!\n");
+	}
+	// set sock opts
+	DWORD soVal = 5000;  // 5000 ms
+	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&soVal, 4);
+	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&soVal, 4);
+	soVal = 2048;  // 2048 bytes
+	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_SNDBUF, (const char*)&soVal, 4);
+	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_RCVBUF, (const char*)&soVal, 4);
+	soVal = 1;  // true
+	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, 0x5801, (const char*)&soVal, 4);
+	// bind to the port
+	if ((sockErr = NetDll_bind(XNCALLER_SYSAPP, svrSock, (SOCKADDR*)&name, sizeof(name))) != S_OK) {
+		InfoPrint("NetDll_bind failed!\n");
+	}
+	// listen on the bound socket
+	if ((sockErr = NetDll_listen(XNCALLER_SYSAPP, svrSock, 2)) != S_OK) {
+		InfoPrint("NetDll_listen failed!\n");
+	}
+
+	BYTE buffer[2048];
+	while (true) {
+		SOCKET cliSock = NetDll_accept(XNCALLER_SYSAPP, svrSock, NULL, NULL);
+		if (cliSock == INVALID_SOCKET) {
+			InfoPrint("NetDll_accept failed!\n");
+			break;
+		}
+		memset(buffer, 0, 2048);
+		int size = NetDll_recv(XNCALLER_SYSAPP, cliSock, (const char*)&buffer, 4, 0);
+		if (size == 4) {  // received packet size
+			DWORD pktSize = *(PDWORD)&buffer;
+			if (pktSize > 0 && pktSize <= 2044) {  // check bounds
+				size = NetDll_recv(XNCALLER_SYSAPP, cliSock, (const char*)&buffer + 4, pktSize, 0);
+				BYTE pktCmd = *(PBYTE)&buffer;
+				PBYTE pktData = ((PBYTE)&buffer) + 1;
+				if (pktCmd == 0) {
+					InfoPrint("Shutting down RPC...\n");
+					break;
+				}
+			}
+		}
+	}
+
+	NetDll_shutdown(XNCALLER_SYSAPP, svrSock, SD_BOTH);
+	NetDll_closesocket(XNCALLER_SYSAPP, svrSock);
+	WSACleanup();
+}
+
+BOOL RPCStartup() {
+	InfoPrint("Initializing RPC...\n");
+
+	HANDLE hThread;
+	DWORD dwThread;
+	ExCreateThread(&hThread, 0, &dwThread, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)RPCThread, 0, 2);
+	XSetThreadProcessor(hThread, 4);
+	ResumeThread(hThread);
+	CloseHandle(hThread);
+
+	return TRUE;
+}
+
 BOOL Initialize(HANDLE hModule) {
 	InfoPrint("===RGLoader Runtime Patcher - Version 02===\n");
 
@@ -415,7 +581,7 @@ BOOL Initialize(HANDLE hModule) {
 		InfoPrint("ERROR: Unable to open ini file!\r\n");
 		PatchMapUSB();
 		fKeepMemory = false;
-		return 0;
+		return FALSE;
 	}
 
 	/*
@@ -453,6 +619,8 @@ BOOL Initialize(HANDLE hModule) {
 	// booleans - config
 	if (!reader->GetBoolean("Config", "NoRGLP", false))
 		PatchSearchBinary();
+	if (reader->GetBoolean("Config", "RPC", false))
+		RPCStartup();
 	// booleans - expansion
 	if (reader->GetBoolean("Expansion", "MapUSBMass", false))
 		PatchMapUSB();
@@ -485,6 +653,8 @@ BOOL Initialize(HANDLE hModule) {
 
 	if (fExpansionEnabled) {
 		CPUStuff();
+		// FuseStuff();
+		KeyVaultStuff();
 
 		if (disableExpansionInstall) {
 			if (DisableExpansionInstalls() == TRUE)
@@ -498,10 +668,14 @@ BOOL Initialize(HANDLE hModule) {
 	}
 
 	// skip plugin loading
-	if (XamLoaderGetDvdTrayState() == DVD_TRAY_STATE_OPEN) {
+	DVD_TRAY_STATE dts = XamLoaderGetDvdTrayState();
+	if (dts == DVD_TRAY_STATE_OPENING || dts == DVD_TRAY_STATE_OPEN) {
 		InfoPrint("Skipping RGLoader init...\n");
 		return TRUE;
 	}
+
+	// register for title ID changes
+	// ExRegisterThreadNotification(&xThreadReg, TRUE);
 
 	// load plugins after expansion shit
 	InfoPrint("Loading plugins...\n");
@@ -514,13 +688,11 @@ BOOL APIENTRY DllMain(HANDLE hModule, DWORD dwReason, LPVOID lpReserved) {
 	if(dwReason == DLL_PROCESS_ATTACH) {
 		Initialize(hModule);
 
-		Sleep(2000);
-
 		//set load count to 1
 		if(!fKeepMemory) {
 			*(WORD*)((DWORD)hModule + 64) = 1;
 			return FALSE;
-		} else return true;
+		} else return TRUE;
 	}
 	return TRUE;
 }

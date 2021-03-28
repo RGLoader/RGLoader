@@ -391,11 +391,11 @@ HRESULT cOzMount(const char* szDrive, const char* szDevice, const char* sysStr)
 
 void RelaunchXShell(void) {
 
-	printf("[RGLOADER]: Thread ---------!\n");
+	InfoPrint("Thread ---------!\n");
 
 	if(KeGetCurrentProcessType() == PROC_SYSTEM) {
-		printf("[RGLOADER]: Thread is still system!\n");
-	} else printf("[RGLOADER]: Attempting to launch xshell! Mounting drives..\n");
+		InfoPrint("Thread is still system!\n");
+	} else InfoPrint("Attempting to launch xshell! Mounting drives..\n");
 
 
 	/*XFlushUtilityDrive();
@@ -428,7 +428,7 @@ void LaunchXShell(void)
 			printf("[RGLOADER]: Freeing Hud.xex library\n");
 			FreeLibraryAndExitThread(handle, 1);
 		}*/
-		printf("[RGLOADER]: System thread, attempting to launch xshell.\n");
+		InfoPrint("System thread, attempting to launch xshell.\n");
 		XSetLaunchData( NULL, 0 );
 
 		//XamLoaderLaunchTitleEx("\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector\\DashSelector.xex", "\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector", NULL, 0);
@@ -448,7 +448,7 @@ void LaunchXShell(void)
     }
     else
     {
-		printf("[RGLOADER]: Launching xshell!");
+		InfoPrint("Launching xshell!");
         RelaunchXShell();
     }
 }
@@ -719,3 +719,13 @@ bool WriteFile(LPCSTR filename, PVOID buffer, DWORD size)
 		return false;
 	return true;
 }
+
+/* HANDLE RGLCreateThread(LPVOID startAddr, LPVOID parameters) {
+	HANDLE hThread; DWORD hThreadID;
+	ExCreateThread(&hThread, 0, &hThreadID, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)startAddr, parameters, THREAD_PRIORITY_HIGHEST);
+	XSetThreadProcessor(hThread, 4);
+	ResumeThread(hThread);
+	CloseHandle(hThread);
+
+	return hThread;
+} */
