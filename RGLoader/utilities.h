@@ -66,7 +66,7 @@ BOOL WriteBufToFile(const char* szPath, PBYTE pbData, DWORD dwLen, BOOL wRemoveE
 PBYTE ReadFileToBuf(const char* szPath, PDWORD size);
 int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &refcstrDestinationDirectory);
 
-void InfoPrint(const char* data, ...);
+void RGLPrint(const char* category, const char* data, ...);
 void HexPrint(BYTE* data, size_t len);
 QWORD FileSize(LPCSTR filename);
 bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size);

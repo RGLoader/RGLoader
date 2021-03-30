@@ -12,6 +12,7 @@
 #include "xshell.h"
 #include "HvExpansion.h"
 #include "OffsetManager.h"
+#include "RPC.h"
 // #include "sysext.h"
 
 using namespace std;
@@ -67,25 +68,25 @@ BOOL ExpansionStuff() {
 	0xC8007005 // ...
 	*/
 
-	InfoPrint("Checking if the HVPP expansion is installed...\n");
+	RGLPrint("EXPANSION", "Checking if the HVPP expansion is installed...\n");
 	if (HvPeekWORD(0) != 0x5E4E) {
 		// install signed and encrypted HVPP expansion
-		InfoPrint("Installing HVPP expansion...\n");
+		RGLPrint("EXPANSION", "Installing HVPP expansion...\n");
 		DWORD ret = InstallExpansion();
 		if (ret != ERROR_SUCCESS) {
-			InfoPrint("InstallExpansion: %04X\n", ret);
+			RGLPrint("EXPANSION", "InstallExpansion: %04X\n", ret);
 			return FALSE;
 		}
-		InfoPrint("Done!\n");
+		RGLPrint("EXPANSION", "Done!\n");
 	}
 	else
-		InfoPrint("Expansion is already installed, skipping...\n");
+		RGLPrint("EXPANSION", "Expansion is already installed, skipping...\n");
 
 	return TRUE;
 }
 
 BOOL CPUStuff() {
-	InfoPrint("CPU key: ");
+	RGLPrint("CPU", "CPU key: ");
 	BYTE CPUKeyHV[0x10];
 	HvPeekBytes(0x20, CPUKeyHV, 0x10);
 	HexPrint(CPUKeyHV, 0x10);
@@ -131,18 +132,18 @@ BOOL KeyVaultStuff() {
 	// master public key in the HV
 	HvPeekBytes(pMasterPub, masterPub, sizeof(XECRYPT_RSAPUB_2048));
 
-	InfoPrint("Console Serial: %s\n", kvBuf + 0xB0);
+	RGLPrint("KV", "Console Serial: %s\n", kvBuf + 0xB0);
 
 	if (XeCryptBnDwLePkcs1Verify(kvHash, kvData + 0x1DE0, sizeof(XECRYPT_SIG)) == TRUE)
-		InfoPrint("KV hash is valid for this console!\n");
+		RGLPrint("WARNING", "KV hash is valid for this console!\n");
 	else
-		InfoPrint("KV hash is invalid for this console!\n");
+		RGLPrint("WARNING", "KV hash is invalid for this console!\n");
 
 	return TRUE;
 }
 
 void PatchBlockLIVE(){
-	InfoPrint(" * Blocking Xbox Live DNS\r\n");
+	RGLPrint("PROTECTIONS", " * Blocking Xbox Live DNS\r\n");
 
 	char* nullStr = "NO.%sNO.NO\0";
 	DWORD nullStrSize = 18;
@@ -150,7 +151,7 @@ void PatchBlockLIVE(){
 	XAMOffsets* offsets = offsetmanager.GetXAMOffsets();
 	if(!offsets)
 	{
-		InfoPrint("Failed to load DNS offsets!\r\n");
+		RGLPrint("ERROR", "Failed to load DNS offsets!\r\n");
 		return;
 	}
 
@@ -171,11 +172,11 @@ void PatchMapUSB(void) {
 	XBDMOffsets* offsets = offsetmanager.GetXBDMOffsets();
 	if(!offsets)
 	{
-		InfoPrint("Failed to load XBDM offsets!\n");
+		RGLPrint("ERROR", "Failed to load XBDM offsets!\n");
 		return;
 	}
 
-	InfoPrint(" * Adding extra devices to xbox neighborhood\r\n");
+	RGLPrint("INFO", " * Adding extra devices to xbox neighborhood\r\n");
 	{	
 		/*
 		// dynamically map all the drives in the XBDMOffsets struct
@@ -232,7 +233,7 @@ void PatchMapUSB(void) {
 //21076
 // Changes the default dashboard
 void PatchDefaultDash(string path) {
-	InfoPrint(" * Reconfiguring default dash to: %s\r\n", path);
+	RGLPrint("INFO", " * Reconfiguring default dash to: %s\n", path);
 	
 	ofstream dashxbx;
 
@@ -245,7 +246,7 @@ void PatchDefaultDash(string path) {
 			dashxbx << '\0';
 		dashxbx.close();
 	} else {
-		InfoPrint("   ERROR: unable to write dashboard.xbx\r\n");
+		RGLPrint("ERROR", "unable to write dashboard.xbx\n");
 	}
 }
 
@@ -328,7 +329,7 @@ NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE mo
 				if (offsets != NULL) {
 					setmem(offsets->NoSignInNotice, 0x38600000);
 				} else {
-					printf("Failed to load signin offsets!\r\n");
+					RGLPrint("ERROR", "Failed to load signin offsets!\r\n");
 				}
 			}
 		}
@@ -339,16 +340,16 @@ NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE mo
 DWORD PatchApplyBinary(string filepath) {
 	DWORD fileSize = FileSize(filepath.c_str());
 	if (fileSize == -1) {
-		InfoPrint("    ERROR: Invalid patch path\n");
+		RGLPrint("ERROR", "Invalid patch path\n");
 		return FALSE;
 	}
 	if (fileSize % 4 != 0) {
-		InfoPrint("    ERROR: Invalid patch size\n");
+		RGLPrint("ERROR", "Invalid patch size\n");
 		return FALSE;
 	}
 	BYTE* patchData = new BYTE[fileSize];
 	if (!ReadFile(filepath.c_str(), patchData, fileSize)) {
-		InfoPrint("    ERROR: Unable to read patch file\n");
+		RGLPrint("ERROR", "Unable to read patch file\n");
 		return FALSE;
 	}
 
@@ -378,15 +379,15 @@ void PatchSearchBinary(void) {
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
 
-	InfoPrint(" * Searching for additional RGLP binary patch files\n");
+	RGLPrint("INFO", " * Searching for additional RGLP binary patch files\n");
 
 	// HDD
 	hFind = FindFirstFile("HDD:\\*.rglp", &FindFileData);
 	while (hFind != INVALID_HANDLE_VALUE) {
-		InfoPrint("  **located binary: %s\n", FindFileData.cFileName);
+		RGLPrint("INFO", "  **located binary: %s\n", FindFileData.cFileName);
 
 		if (PatchApplyBinary("HDD:\\" + (string)FindFileData.cFileName) <= 0)
-			InfoPrint("  ERROR: Cannot apply patch\n");
+			RGLPrint("ERROR", "Cannot apply patch\n");
 
 		if (!FindNextFile(hFind, &FindFileData))
 			hFind = INVALID_HANDLE_VALUE;
@@ -395,10 +396,10 @@ void PatchSearchBinary(void) {
 	// USB
 	hFind = FindFirstFile("Mass0:\\*.rglp", &FindFileData);
 	while (hFind != INVALID_HANDLE_VALUE) {
-		InfoPrint("  **located binary: %s\n", FindFileData.cFileName);
+		RGLPrint("INFO", "  **located binary: %s\n", FindFileData.cFileName);
 
 		if (PatchApplyBinary("Mass0:\\" + (string)FindFileData.cFileName) <= 0)
-			InfoPrint("  ERROR: Cannot apply patch\n");
+			RGLPrint("ERROR", "Cannot apply patch\n");
 
 		if (!FindNextFile(hFind, &FindFileData))
 			hFind = INVALID_HANDLE_VALUE;
@@ -409,27 +410,27 @@ VOID LoadPlugins() {
 	string temp = reader->GetString("Plugins", "Plugin1", "none");
 	if(temp != "none" && FileExists(temp.c_str())) {
 		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			InfoPrint(" ERROR: Failed to load %s", temp.c_str());
+			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
 	}
 	temp = reader->GetString("Plugins", "Plugin2", "none");
 	if (temp != "none" && FileExists(temp.c_str())) {
 		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			InfoPrint(" ERROR: Failed to load %s", temp.c_str());
+			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
 	}
 	temp = reader->GetString("Plugins", "Plugin3", "none");
 	if (temp != "none" && FileExists(temp.c_str())) {
 		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			InfoPrint(" ERROR: Failed to load %s", temp.c_str());
+			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
 	}
 	temp = reader->GetString("Plugins", "Plugin4", "none");
 	if (temp != "none" && FileExists(temp.c_str())) {
 		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			InfoPrint(" ERROR: Failed to load %s", temp.c_str());
+			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
 	}
 	temp = reader->GetString("Plugins", "Plugin5", "none");
 	if (temp != "none" && FileExists(temp.c_str())) {
 		if(XexLoadImage(temp.c_str(), 8, 0, NULL))
-			InfoPrint(" ERROR: Failed to load %s", temp.c_str());
+			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
 	}
 }
 
@@ -473,162 +474,8 @@ EX_THREAD_REGISTRATION xThreadReg = {
 	0
 }; */
 
-int BufferedSend(SOCKET sock, PBYTE buffer, DWORD size) {
-	int bLeft = size;
-	int sBytes = 0;
-	while (bLeft > 0) {
-		int tsBytes = NetDll_send(XNCALLER_SYSAPP, sock, (const char*)(buffer + sBytes), (bLeft >= 2048 ? 2048 : bLeft), 0);
-		if (tsBytes == SOCKET_ERROR) {
-			continue;
-		}
-		bLeft -= tsBytes;
-		sBytes += tsBytes;
-	}
-	return sBytes;
-}
-
-int BufferedReceive(SOCKET sock, PBYTE buffer, DWORD size) {
-	int bLeft = size;
-	int rBytes = 0;
-	while (bLeft > 0) {
-		int trBytes = NetDll_recv(XNCALLER_SYSAPP, sock, (const char*)(buffer + rBytes), (bLeft >= 2048 ? 2048 : bLeft), 0);
-		if (trBytes == SOCKET_ERROR) {
-			continue;
-		}
-		bLeft -= trBytes;
-		rBytes += trBytes;
-	}
-	return rBytes;
-}
-
-void RPCThread() {
-	WSADATA wsaData;
-	DWORD sockErr;
-	SOCKADDR_IN name;
-	name.sin_family = AF_INET;
-	name.sin_port = htons(10101);
-	name.sin_addr.S_un.S_addr = inet_addr("0.0.0.0");
-	// XNetStartupParams xnsp;
-
-	// startup networking
-	/* if ((sockErr = NetDll_XNetStartup(XNCALLER_SYSAPP, &xnsp)) != S_OK) {
-		InfoPrint("NetDll_XNetStartup failed!\n");
-	} */
-	if ((sockErr = NetDll_WSAStartupEx(XNCALLER_SYSAPP, MAKEWORD(2, 2), &wsaData, 2)) != S_OK) {
-		InfoPrint("NetDll_WSAStartupEx failed!\n");
-	}
-	// create socket
-	SOCKET svrSock = NetDll_socket(XNCALLER_SYSAPP, AF_INET, SOCK_STREAM, IPPROTO_IP);
-	if (svrSock == INVALID_SOCKET) {
-		InfoPrint("NetDll_socket failed!\n");
-		WSACleanup();
-	}
-	// set sock opts
-	DWORD soVal = 5000;  // 5000 ms
-	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&soVal, 4);
-	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&soVal, 4);
-	soVal = 2048;  // 2048 bytes
-	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_SNDBUF, (const char*)&soVal, 4);
-	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, SO_RCVBUF, (const char*)&soVal, 4);
-	soVal = 1;  // true
-	NetDll_setsockopt(XNCALLER_SYSAPP, svrSock, SOL_SOCKET, 0x5801, (const char*)&soVal, 4);
-	// bind to the port
-	if ((sockErr = NetDll_bind(XNCALLER_SYSAPP, svrSock, (SOCKADDR*)&name, sizeof(name))) != S_OK) {
-		InfoPrint("NetDll_bind failed!\n");
-		goto SvrSockDone;
-	}
-	// listen on the bound socket
-	if ((sockErr = NetDll_listen(XNCALLER_SYSAPP, svrSock, 2)) != S_OK) {
-		InfoPrint("NetDll_listen failed!\n");
-		goto SvrSockDone;
-	}
-
-	while (true) {
-		SOCKET cliSock = NetDll_accept(XNCALLER_SYSAPP, svrSock, NULL, NULL);
-		if (cliSock == INVALID_SOCKET) {
-			InfoPrint("NetDll_accept failed!\n");
-			goto SvrSockDone;
-		}
-		BYTE buffer[4] = { 0 };
-		int size = NetDll_recv(XNCALLER_SYSAPP, cliSock, (const char*)&buffer, 4, 0);
-		if (size == 4) {  // received packet size
-			DWORD pktSize = *(PDWORD)&buffer;
-			InfoPrint("Receiving packet with size 0x%04X\n", pktSize);
-			if (pktSize > 0 && pktSize <= 0xFFFFFFFF) {  // check bounds
-				PBYTE pktBuf = (PBYTE)malloc(pktSize);
-				memset(pktBuf, 0, pktSize);
-
-				BufferedReceive(cliSock, pktBuf, pktSize);
-
-				BYTE pktCmd = *pktBuf;
-				PBYTE pktData = pktBuf + 1;
-				if (pktCmd == PeekBYTE) {  // peek BYTE
-					/* InfoPrint("Shutting down RPC...\n");
-					free(pktBuf);
-					NetDll_shutdown(XNCALLER_SYSAPP, cliSock, SD_BOTH);
-					NetDll_closesocket(XNCALLER_SYSAPP, cliSock);
-					goto SvrSockDone; */
-					QWORD peekAddr = *(PQWORD)pktData;
-					InfoPrint("Peeking BYTE @ 0x%llx...\n", peekAddr);
-					BYTE v = HvPeekBYTE(peekAddr);
-					BufferedSend(cliSock, (PBYTE)&v, sizeof(BYTE));
-				} else if (pktCmd == PeekWORD) {  // peek WORD
-					QWORD peekAddr = *(PQWORD)pktData;
-					InfoPrint("Peeking WORD @ 0x%llx...\n", peekAddr);
-					WORD v = HvPeekWORD(peekAddr);
-					BufferedSend(cliSock, (PBYTE)&v, sizeof(WORD));
-				} else if (pktCmd == PeekDWORD) {  // peek DWORD
-					QWORD peekAddr = *(PQWORD)pktData;
-					InfoPrint("Peeking DWORD @ 0x%llx...\n", peekAddr);
-					DWORD v = HvPeekDWORD(peekAddr);
-					BufferedSend(cliSock, (PBYTE)&v, sizeof(DWORD));
-				} else if (pktCmd == PeekQWORD) {  // peek QWORD
-					QWORD peekAddr = *(PQWORD)pktData;
-					InfoPrint("Peeking QWORD @ 0x%llx...\n", peekAddr);
-					QWORD v = HvPeekQWORD(peekAddr);
-					BufferedSend(cliSock, (PBYTE)&v, sizeof(QWORD));
-				} else if (pktCmd == PeekBytes) {  // peek bytes
-					QWORD peekAddr = *(PQWORD)pktData;
-					DWORD peekSize = *(PDWORD)(pktData + sizeof(QWORD));
-					InfoPrint("Peeking 0x%lx bytes(s) @ 0x%llx...\n", peekSize, peekAddr);
-					PBYTE peekBuf = (PBYTE)malloc(peekSize);
-					memset(peekBuf, 0, peekSize);
-					HvPeekBytes(peekAddr, peekBuf, peekSize);
-
-					BufferedSend(cliSock, (PBYTE)&peekSize, sizeof(DWORD));
-					BufferedSend(cliSock, peekBuf, peekSize);
-
-					free(peekBuf);
-				}
-				free(pktBuf);
-				NetDll_shutdown(XNCALLER_SYSAPP, cliSock, SD_BOTH);
-				NetDll_closesocket(XNCALLER_SYSAPP, cliSock);
-			}
-		}
-	}
-
-SvrSockDone:
-	NetDll_shutdown(XNCALLER_SYSAPP, svrSock, SD_BOTH);
-	NetDll_closesocket(XNCALLER_SYSAPP, svrSock);
-	WSACleanup();
-}
-
-BOOL RPCStartup() {
-	InfoPrint("Initializing RPC...\n");
-
-	HANDLE hThread;
-	DWORD dwThread;
-	ExCreateThread(&hThread, 0, &dwThread, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)RPCThread, 0, 2);
-	SetThreadPriority(hThread, THREAD_PRIORITY_ABOVE_NORMAL);
-	XSetThreadProcessor(hThread, 4);
-	ResumeThread(hThread);
-	CloseHandle(hThread);
-
-	return TRUE;
-}
-
 BOOL Initialize(HANDLE hModule) {
-	InfoPrint("===RGLoader Runtime Patcher - Version 02===\n");
+	RGLPrint("INFO", "===RGLoader Runtime Patcher - Version 02===\n");
 
 	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\Hdd:");
 	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\HDD:");
@@ -640,7 +487,7 @@ BOOL Initialize(HANDLE hModule) {
 	Mount("\\SystemRoot", "\\System??\\Root:");
 
 	// install the expansion
-	fExpansionEnabled = ExpansionStuff();
+	fExpansionEnabled = (ExpansionStuff() == TRUE);
 	
 	// check for ini
 	reader = new INIReader("Mass0:\\rgloader.ini");
@@ -652,7 +499,7 @@ BOOL Initialize(HANDLE hModule) {
 		reader = new INIReader("Hdd:\\rgloader.ini");
 
 	if(reader->ParseError() < 0) {
-		InfoPrint("ERROR: Unable to open ini file!\r\n");
+		RGLPrint("ERROR", "Unable to open ini file!\r\n");
 		PatchMapUSB();
 		fKeepMemory = false;
 		return FALSE;
@@ -695,9 +542,9 @@ BOOL Initialize(HANDLE hModule) {
 		PatchSearchBinary();
 	if (reader->GetBoolean("Config", "RPC", false)) {
 		if (fExpansionEnabled)
-			RPCStartup();
+			RPCServerStartup();
 		else
-			InfoPrint("RPC is enabled in the config but the expansion isn't installed!\n");
+			RGLPrint("INFO", "RPC is enabled in the config but the expansion isn't installed!\n");
 	}
 	// booleans - expansion
 	if (reader->GetBoolean("Expansion", "MapUSBMass", false))
@@ -719,7 +566,7 @@ BOOL Initialize(HANDLE hModule) {
 	if (defaultDashboard != "none" && FileExists(defaultDashboard.c_str()))
 		PatchDefaultDash(defaultDashboard);
 
-	InfoPrint("Patches successfully applied!\n");
+	RGLPrint("INFO", "Patches successfully applied!\n");
 
 	/* if(fExpansionEnabled)
 	{
@@ -736,19 +583,19 @@ BOOL Initialize(HANDLE hModule) {
 
 		if (disableExpansionInstall) {
 			if (DisableExpansionInstalls() == TRUE)
-				InfoPrint("HvxExpansionInstall unpatched successfully!\n");
+				RGLPrint("PROTECTIONS", "HvxExpansionInstall unpatched successfully!\n");
 		}
 
 		if (disableShadowboots) {
 			if (DisableShadowbooting() == TRUE)
-				InfoPrint("HvxShadowboot disabled!\n");
+				RGLPrint("PROTECTIONS", "HvxShadowboot disabled!\n");
 		}
 	}
 
 	// skip plugin loading
 	DVD_TRAY_STATE dts = XamLoaderGetDvdTrayState();
 	if (dts == DVD_TRAY_STATE_OPENING || dts == DVD_TRAY_STATE_OPEN) {
-		InfoPrint("Skipping RGLoader init...\n");
+		RGLPrint("INFO", "Skipping RGLoader init...\n");
 		return TRUE;
 	}
 
@@ -756,7 +603,7 @@ BOOL Initialize(HANDLE hModule) {
 	// ExRegisterThreadNotification(&xThreadReg, TRUE);
 
 	// load plugins after expansion shit
-	InfoPrint("Loading plugins...\n");
+	RGLPrint("INFO", "Loading plugins...\n");
 	LoadPlugins();
 
 	return TRUE;

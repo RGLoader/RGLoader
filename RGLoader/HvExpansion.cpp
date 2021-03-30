@@ -109,7 +109,7 @@ NTSTATUS HvPeekBytes(QWORD Address, PVOID Buffer, DWORD Size) {
 		XPhysicalFree(data);
 	}
 	else
-		InfoPrint("Error allocating buffer!");
+		RGLPrint("ERROR", "Allocating HvPeekBytes buffer failed!");
 	return result;
 }
 
@@ -140,7 +140,7 @@ NTSTATUS HvPokeBytes(QWORD Address, const void* Buffer, DWORD Size) {
 		XPhysicalFree(data);
 	}
 	else
-		InfoPrint("Error allocating buffer!");
+		RGLPrint("ERROR", "Allocating HvPokeBytes buffer failed!");
 	return result;
 }
 
@@ -190,7 +190,7 @@ BOOL DisableShadowbooting() {
 BOOL LaunchXELL(LPCSTR path) {
 	DWORD fileSize = FileSize(path);
 	if (fileSize == -1) {
-		InfoPrint("    ERROR: Invalid XELL path\n");
+		RGLPrint("ERROR", "Invalid XELL path\n");
 		return FALSE;
 	}
 	PBYTE data = (PBYTE)XPhysicalAlloc(fileSize, MAXULONG_PTR, 0, MEM_LARGE_PAGES | PAGE_READWRITE | PAGE_NOCACHE);
@@ -210,16 +210,16 @@ BOOL LaunchXELL(LPCSTR path) {
 BOOL LoadApplyHV(const char* filepath) {
 	DWORD fileSize = FileSize(filepath);
 	if (fileSize == -1) {
-		InfoPrint("    ERROR: Invalid HV patch path\n");
+		RGLPrint("ERROR", "Invalid HV patch path\n");
 		return FALSE;
 	}
 	if (fileSize % 4 != 0) {
-		InfoPrint("    ERROR: Invalid HV patch size\n");
+		RGLPrint("ERROR", "Invalid HV patch size\n");
 		return FALSE;
 	}
 	BYTE* patchData = (BYTE*)XPhysicalAlloc(fileSize, MAXULONG_PTR, 0, PAGE_READWRITE);
 	if (!ReadFile(filepath, patchData, fileSize)) {
-		InfoPrint("    ERROR: Unable to read HV patch file\n");
+		RGLPrint("ERROR", "Unable to read HV patch file\n");
 		XPhysicalFree(patchData);
 		return FALSE;
 	}
@@ -248,16 +248,16 @@ BOOL LoadApplyHV(const char* filepath) {
 BOOL LoadKeyVault(const char* filepath) {
 	DWORD fileSize = FileSize(filepath);
 	if (fileSize == -1) {
-		InfoPrint("    ERROR: Invalid KV path\n");
+		RGLPrint("ERROR", "Invalid KV path\n");
 		return FALSE;
 	}
 	if (fileSize != 0x4000) {
-		InfoPrint("    ERROR: Invalid KV size\n");
+		RGLPrint("ERROR", "Invalid KV size\n");
 		return FALSE;
 	}
 	BYTE* kvData = (BYTE*)XPhysicalAlloc(fileSize, MAXULONG_PTR, 0, PAGE_READWRITE);
 	if (!ReadFile(filepath, kvData, fileSize)) {
-		InfoPrint("    ERROR: Unable to read KV file\n");
+		RGLPrint("ERROR", "Unable to read KV file\n");
 		XPhysicalFree(kvData);
 		return FALSE;
 	}

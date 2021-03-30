@@ -275,7 +275,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ProgramDatabaseFile>$(OutDir)RGLoader.pdb</ProgramDatabaseFile>
       <SetChecksum>true</SetChecksum>
-      <AdditionalDependencies>xapilib.lib;xgraphics.lib;xboxkrnl.lib;xnet.lib;xaudio2.lib;xact3.lib;x3daudio.lib;xmcore.lib;vcomp.lib</AdditionalDependencies>
+      <AdditionalDependencies>xapilib.lib;xgraphics.lib;xboxkrnl.lib;xnet.lib;xaudio2.lib;xact3.lib;x3daudio.lib;xmcore.lib;vcomp.lib;xbdm.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\xkelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>/dll /align:128,4096 %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -298,6 +298,7 @@
     <ClInclude Include="ini.h" />
     <ClInclude Include="INIReader.h" />
     <ClInclude Include="OffsetManager.h" />
+    <ClInclude Include="RPC.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="utilities.h" />
     <ClInclude Include="xam.h" />
@@ -309,6 +310,7 @@
     <ClCompile Include="ini.c" />
     <ClCompile Include="INIReader.cpp" />
     <ClCompile Include="OffsetManager.cpp" />
+    <ClCompile Include="RPC.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Xbox 360'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='CodeAnalysis|Xbox 360'">Create</PrecompiledHeader>

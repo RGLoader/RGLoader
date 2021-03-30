@@ -391,11 +391,11 @@ HRESULT cOzMount(const char* szDrive, const char* szDevice, const char* sysStr)
 
 void RelaunchXShell(void) {
 
-	InfoPrint("Thread ---------!\n");
+	RGLPrint("INFO", "Thread ---------!\n");
 
 	if(KeGetCurrentProcessType() == PROC_SYSTEM) {
-		InfoPrint("Thread is still system!\n");
-	} else InfoPrint("Attempting to launch xshell! Mounting drives..\n");
+		RGLPrint("INFO", "Thread is still system!\n");
+	} else RGLPrint("INFO", "Attempting to launch xshell! Mounting drives..\n");
 
 
 	/*XFlushUtilityDrive();
@@ -428,7 +428,7 @@ void LaunchXShell(void)
 			printf("[RGLOADER]: Freeing Hud.xex library\n");
 			FreeLibraryAndExitThread(handle, 1);
 		}*/
-		InfoPrint("System thread, attempting to launch xshell.\n");
+		RGLPrint("INFO", "System thread, attempting to launch xshell.\n");
 		XSetLaunchData( NULL, 0 );
 
 		//XamLoaderLaunchTitleEx("\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector\\DashSelector.xex", "\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector", NULL, 0);
@@ -448,7 +448,7 @@ void LaunchXShell(void)
     }
     else
     {
-		InfoPrint("Launching xshell!");
+		RGLPrint("INFO", "Launching xshell!");
         RelaunchXShell();
     }
 }
@@ -661,8 +661,10 @@ int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &
 	return 0;
 }
 
-void InfoPrint(const char* data, ...) {
-	std::string infoStr("[RGLoader] ");
+void RGLPrint(const char* category, const char* data, ...) {
+	std::string infoStr("[RGLoader] [");
+	infoStr.append(category);
+	infoStr.append("] ");
 	infoStr.append(data);
 
 	va_list args;

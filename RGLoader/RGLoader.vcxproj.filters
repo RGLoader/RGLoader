@@ -41,6 +41,9 @@
     <ClInclude Include="OffsetManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RPC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -71,6 +74,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RGLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RPC.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
