@@ -43,9 +43,9 @@ struct XBDMOffsets
 	DWORD hddsysaux_enable;
 	DWORD hddsysaux_obname; //device name obj
 
-	DWORD y_obname_ptr; //ptr of device name
-	DWORD y_enable;
-	DWORD y_obname; //device name obj
+	// DWORD y_obname_ptr; //ptr of device name
+	// DWORD y_enable;
+	// DWORD y_obname; //device name obj
 
 	DWORD map_internal_check;  //nop check drivemap internal=1 
 };

@@ -12,25 +12,28 @@ const DWORD RPCBufferSize = 2048;
 #endif
 
 typedef enum {
-	RPCPeekBYTE  = 0,
-	RPCPeekWORD  = 1,
+	RPCPeekBYTE = 0,
+	RPCPeekWORD = 1,
 	RPCPeekDWORD = 2,
 	RPCPeekQWORD = 3,
 	RPCPeekBytes = 4,
 
-	RPCPokeBYTE  = 5,
-	RPCPokeWORD  = 6,
+	RPCPokeBYTE = 5,
+	RPCPokeWORD = 6,
 	RPCPokeDWORD = 7,
 	RPCPokeQWORD = 8,
 	RPCPokeBytes = 9,
-	RPCPeekSPR   = 0xA,
+	RPCPeekSPR = 0xA,
 	RPCHvExecute = 0xC,
 
 	RPCGetModuleProcedureAddress = 0xD,
 	RPCPerformCall = 0xE,
 	RPCListModules = 0xF,
 	RPCReboot = 0x10,
-	RPCShutdown = 0x11
+	RPCShutdown = 0x11,
+	RPCLoadModule = 0x12,
+
+	RPCTest = 0xFF
 };
 
 BOOL RPCServerStartup();

@@ -89,7 +89,7 @@ void RPCClientThread(SOCKET sock) {
 
 			BOOL ret = NT_SUCCESS(HvPokeBYTE(pokeAddr, pokeValue));
 			BufferedSend(sock, (PBYTE)&ret, sizeof(BOOL));
-		} else if(pktCmd == RPCPokeWORD) {  // poke WORD
+		} else if (pktCmd == RPCPokeWORD) {  // poke WORD
 			QWORD pokeAddr = *(PQWORD)pktData;
 			WORD pokeValue = *(PWORD)(pktData + sizeof(QWORD));
 			RPCDebugPrint("RPC", "Poking WORD 0x%hX @ 0x%llX...\n", pokeValue, pokeAddr);
@@ -110,7 +110,7 @@ void RPCClientThread(SOCKET sock) {
 
 			BOOL ret = NT_SUCCESS(HvPokeQWORD(pokeAddr, pokeValue));
 			BufferedSend(sock, (PBYTE)&ret, sizeof(BOOL));
-		} else if(pktCmd == RPCPokeBytes) {  // poke bytes
+		} else if (pktCmd == RPCPokeBytes) {  // poke bytes
 			QWORD pokeAddr = *(PQWORD)pktData;
 			PBYTE pokeData = pktData + sizeof(QWORD);
 			DWORD pokeSize = pktSize - sizeof(BYTE) - sizeof(QWORD);
@@ -125,7 +125,7 @@ void RPCClientThread(SOCKET sock) {
 			HMODULE hMod = GetModuleHandle((char*)pktData);
 			DWORD addr;
 			BOOL ret = NT_SUCCESS(XexGetProcedureAddress(hMod, modOrd, &addr));
-			if(ret == TRUE)
+			if (ret == TRUE)
 				BufferedSend(sock, (PBYTE)&addr, sizeof(DWORD));
 			else
 				BufferedSend(sock, (PBYTE)&ret, sizeof(BOOL));
@@ -133,7 +133,8 @@ void RPCClientThread(SOCKET sock) {
 			QWORD callAddr = *(PQWORD)pktData;
 
 			double FloatArgs[36], f1;
-			QWORD TempInt, IntArgs[36];
+			// QWORD TempInt, IntArgs[36];
+			QWORD IntArgs[36];
 			ZeroMemory(IntArgs, sizeof(IntArgs));
 			ZeroMemory(FloatArgs, sizeof(FloatArgs));
 
@@ -143,14 +144,14 @@ void RPCClientThread(SOCKET sock) {
 
 				FloatArgs[0], FloatArgs[1], FloatArgs[2], FloatArgs[3],
 				FloatArgs[4], FloatArgs[5], FloatArgs[6], FloatArgs[7]
-			);
+				);
 		} else if (pktCmd == RPCListModules) {
 			PDM_WALK_MODULES pWalkMod = NULL;
 			DMN_MODLOAD modLoad;
 			HRESULT hr = DmWalkLoadedModules(&pWalkMod, &modLoad);
 			if (hr != XBDM_NOERR)
 				RPCDebugPrint("ERROR", "Error walking loaded modules!\n");
-			while(hr == XBDM_NOERR) {
+			while (hr == XBDM_NOERR) {
 				RPCDebugPrint("RPC", "%s\n", modLoad.Name);
 				hr = DmWalkLoadedModules(&pWalkMod, &modLoad);
 			}
@@ -161,6 +162,12 @@ void RPCClientThread(SOCKET sock) {
 		} else if (pktCmd == RPCShutdown) {
 			RPCDebugPrint("RPC", "Shutting down now...\n");
 			HalReturnToFirmware(HalPowerDownRoutine);
+		} else if (pktCmd == RPCLoadModule) {
+			RPCDebugPrint("RPC", "Loading module \"%s\"\n", (char*)pktData);
+			BOOL ret = NT_SUCCESS(XexLoadImage((char*)pktData, 8, 0, NULL));
+			BufferedSend(sock, (PBYTE)&ret, sizeof(BOOL));
+		} else if (pktCmd == RPCTest) {
+			RPCDebugPrint("RPC", "Running test...\n");
 		}
 
 		free(pktBuf);

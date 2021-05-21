@@ -176,26 +176,21 @@ DWORD FindInterpretBranch(PDWORD startAddr, DWORD maxSearch)
 
 DWORD RelinkGPLR(int offset, PDWORD saveStubAddr, PDWORD orgAddr)
 {
-	DWORD saver[0x30];
-
-	memcpy(saver, GLPR_FUN, 0x30 * 4);
-
-
-	DWORD inst = 0, repl=0;
+	DWORD inst = 0, repl;
 	int i;
+	PDWORD saver = (PDWORD)GLPR_FUN;
 	// if the msb is set in the instruction, set the rest of the bits to make the int negative
-	if(offset&0x2000000)
-		offset = offset|0xFC000000;
+	if (offset & 0x2000000)
+		offset = offset | 0xFC000000;
 	//DbgPrint("frame save offset: %08x\n", offset);
-	//repl = orgTemp[offset/4];
-	memcpy(&repl, &orgAddr[((DWORD)offset)/4], 4);
+	repl = orgAddr[offset / 4];
 	//DbgPrint("replacing %08x\n", repl);
-	for(i = 0; i < 20; i++)
+	for (i = 0; i < 20; i++)
 	{
-		if(repl == saver[i])
+		if (repl == saver[i])
 		{
-			int newOffset = (int)((PDWORD)(GLPR_FUN)+(DWORD)i)-(int)saveStubAddr;
-			inst = 0x48000001|(newOffset&0x3FFFFFC);
+			int newOffset = (int)&saver[i] - (int)saveStubAddr;
+			inst = 0x48000001 | (newOffset & 0x3FFFFFC);
 			//DbgPrint("saver addr: %08x savestubaddr: %08x\n", &saver[i], saveStubAddr);
 		}
 	}
@@ -203,60 +198,44 @@ DWORD RelinkGPLR(int offset, PDWORD saveStubAddr, PDWORD orgAddr)
 	return inst;
 }
 
-VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, PDWORD oldData, DWORD dest)
+VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, DWORD dest)
 {
-	DWORD temp[0x10];
-	DWORD addrtemp[0x10];
-	memcpy( addrtemp, addr, 0x10 * 4);
-
-	if((saveStub != NULL)&&(addr != NULL))
+	if ((saveStub != NULL) && (addr != NULL))
 	{
 		int i;
 		DWORD addrReloc = (DWORD)(&addr[4]);// replacing 4 instructions with a jump, this is the stub return address
 		//DbgPrint("hooking addr: %08x savestub: %08x dest: %08x addreloc: %08x\n", addr, saveStub, dest, addrReloc);
 		// build the stub
 		// make a jump to go to the original function start+4 instructions
-		if(addrReloc & 0x8000){ // If bit 16 is 1
-			//setmemdm( &saveStub[0], (0x3D600000 + (((addrReloc >> 16) & 0xFFFF) + 1)));
-			temp[0] = 0x3D600000 + (((addrReloc >> 16) & 0xFFFF) + 1); // lis %r11, dest>>16 + 1printf("  - one\r\n");
-		}else{
-			//setmemdm( &saveStub[0], (0x3D600000 + (((addrReloc >> 16) & 0xFFFF) + 1)));
-			temp[0] = 0x3D600000 + ((addrReloc >> 16) & 0xFFFF); // lis %r11, dest>>16
-		}
+		DWORD writeBuffer;
 
+		writeBuffer = 0x3D600000 + (((addrReloc >> 16) & 0xFFFF) + (addrReloc & 0x8000 ? 1 : 0)); // lis %r11, dest>>16 + 1
+		saveStub[0] = writeBuffer;
 
-		temp[1] = 0x396B0000 + (addrReloc & 0xFFFF); // addi %r11, %r11, dest&0xFFFF
-		temp[2] = 0x7D6903A6; // mtctr %r11
+		writeBuffer = 0x396B0000 + (addrReloc & 0xFFFF); // addi %r11, %r11, dest&0xFFFF
+		saveStub[1] = writeBuffer;
+
+		writeBuffer = 0x7D6903A6; // mtctr %r11
+		saveStub[2] = writeBuffer;
+
 		// instructions [3] through [6] are replaced with the original instructions from the function hook
 		// copy original instructions over, relink stack frame saves to local ones
-		if(oldData != NULL)
+		for (i = 0; i < 4; i++)
 		{
-			for(i = 0; i<4; i++)
-				oldData[i] = addrtemp[i];
+			writeBuffer = ((addr[i] & 0x48000003) == 0x48000001) ? RelinkGPLR((addr[i] & ~0x48000003), &saveStub[i + 3], &addr[i]) : addr[i];
+			saveStub[i + 3] = writeBuffer;
 		}
-		for(i = 0; i<4; i++)
-		{
-			if((addrtemp[i]&0x48000003) == 0x48000001) // branch with link
-			{
-				//DbgPrint("relink %08x\n", addr[i]);
-				temp[i+3] = RelinkGPLR((addrtemp[i]&~0x48000003), &saveStub[i+3], &addr[i]);
-			}
-			else
-			{
-				//DbgPrint("copy %08x\n", addr[i]);
-				temp[i+3] = addrtemp[i];
-			}
-		}
+		writeBuffer = 0x4E800420; // bctr
+		saveStub[7] = writeBuffer;
 
-		temp[7] = 0x4E800420; // bctr
-		//doSync(temp);
+		doSync(saveStub);
+
 		//DbgPrint("savestub:\n");
 		//for(i = 0; i < 8; i++)
 		//{
 		//	DbgPrint("PatchDword(0x%08x, 0x%08x);\n", &saveStub[i], saveStub[i]);
 		//}
 		// patch the actual function to jump to our replaced one
-		memcpy( saveStub, temp, 8 * 4); 
 		PatchInJump(addr, dest, FALSE);
 	}
 }
@@ -283,23 +262,23 @@ DWORD FindInterpretBranchOrdinal(PCHAR modname, DWORD ord, DWORD maxSearch)
 	return ret;
 }
 
-VOID PatchInJump(DWORD* addr, DWORD dest, BOOL linked){
-	DWORD temp[4];
+VOID PatchInJump(PDWORD addr, DWORD dest, BOOL linked)
+{
+	DWORD writeBuffer;
 
-	if(dest & 0x8000) // If bit 16 is 1
-		temp[0] = 0x3D600000 + (((dest >> 16) & 0xFFFF) + 1); // lis 	%r11, dest>>16 + 1
-	else
-		temp[0] = 0x3D600000 + ((dest >> 16) & 0xFFFF); // lis 	%r11, dest>>16
+	writeBuffer = 0x3D600000 + (((dest >> 16) & 0xFFFF) + (dest & 0x8000 ? 1 : 0)); // lis %r11, dest>>16 + 1
+	addr[0] = writeBuffer;
 
-	temp[1] = 0x396B0000 + (dest & 0xFFFF); // addi	%r11, %r11, dest&0xFFFF
-	temp[2] = 0x7D6903A6; // mtctr	%r11
+	writeBuffer = 0x396B0000 + (dest & 0xFFFF); // addi %r11, %r11, dest&0xFFFF
+	addr[1] = writeBuffer;
 
-	if(linked)
-		temp[3] = 0x4E800421; // bctrl
-	else
-		temp[3] = 0x4E800420; // bctr
-	
-	memcpy(addr,temp, 0x10);
+	writeBuffer = 0x7D6903A6; // mtctr %r11
+	addr[2] = writeBuffer;
+
+	writeBuffer = 0x4E800420 | (linked ? 1 : 0); // bctr
+	addr[3] = writeBuffer;
+
+	doSync(addr);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -673,7 +652,7 @@ void RGLPrint(const char* category, const char* data, ...) {
 	va_end(args);
 }
 
-void HexPrint(BYTE* data, size_t len) {
+void HexPrint(BYTE* data, DWORD len) {
 	for (int i = 0; i < len; i++) {
 		printf("%02X", data[i]);
 	}

@@ -14,7 +14,7 @@
      
 	<mediatypes>
 		<flash/>
-    <harddisk/>
+		<harddisk/>
 	</mediatypes>
      
 	<baseaddr addr="0x91800000"/>

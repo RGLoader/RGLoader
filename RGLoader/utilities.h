@@ -45,7 +45,7 @@ UINT32 __declspec() HvxSetState(UINT32 mode);
 void Mount(char* dev, char* mnt);
 DWORD ResolveFunction(char* modname, DWORD ord);
 DWORD InterpretBranchDestination(DWORD currAddr, DWORD brInst);
-VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, PDWORD oldData, DWORD dest);
+VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, DWORD dest);
 VOID UnhookFunctionStart(PDWORD addr, PDWORD oldData);
 DWORD RelinkGPLR(int offset, PDWORD saveStubAddr, PDWORD orgAddr);
 DWORD FindInterpretBranch(PDWORD startAddr, DWORD maxSearch);
@@ -67,7 +67,7 @@ PBYTE ReadFileToBuf(const char* szPath, PDWORD size);
 int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &refcstrDestinationDirectory);
 
 void RGLPrint(const char* category, const char* data, ...);
-void HexPrint(BYTE* data, size_t len);
+void HexPrint(BYTE* data, DWORD len);
 QWORD FileSize(LPCSTR filename);
 bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size);
 bool WriteFile(LPCSTR filename, PVOID buffer, DWORD size);
