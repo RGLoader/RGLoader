@@ -1,7 +1,7 @@
 #include "OffsetManager.h"
 
 // XBDM offsets
-XBDMOffsets XBDM_17489 = {
+/* XBDMOffsets XBDM_17489 = {
 	// mass0
 	0x91F96F68,
 	(0x91F96F68 + 0x28),
@@ -36,7 +36,8 @@ XBDMOffsets XBDM_17489 = {
 	// 0x91F0094C,
 	// check
 	0x91F329DC
-};
+}; */
+
 //XBDMOffsets xbdm_17502 = xbdm_17489;
 //XBDMOffsets xbdm_17511 = xbdm_17489;
 //XBDMOffsets xbdm_17526 = xbdm_17489;
@@ -110,21 +111,12 @@ short OffsetManager::GetKernelVersion()
 	}
 }
 
-XBDMOffsets* OffsetManager::GetXBDMOffsets()
+/* XBDMOffsets* OffsetManager::GetXBDMOffsets()
 {
-	/*
-	for(int i = 0; i < kernels; i++)
-	{
-		if(kernelversions[i] == _kernel)
-		{
-			return xbdmoffsets[i];
-		}
-	}
-	*/
 	if (_kernel >= 17489)
 		return &XBDM_17489;
 	return NULL;
-}
+} */
 
 XAMOffsets* OffsetManager::GetXAMOffsets()
 {

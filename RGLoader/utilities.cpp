@@ -3,6 +3,9 @@
 #include <string>
 //#include <xfilecache.h>
 
+char m_hookSection[0x500];
+int m_hookCount;
+
 /*
 public NeighborhoodDrives(XboxConsole Console, EndianIO XMS, uint NopAddress, uint DriveTableAddress, uint MountedPackageTableAddress, uint[] XBDMRange)
 
@@ -242,7 +245,7 @@ VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, DWORD dest)
 
 VOID UnhookFunctionStart(PDWORD addr, PDWORD oldData)
 {
-	if((addr != NULL)&&(oldData != NULL))
+	if((addr != NULL) && (oldData != NULL))
 	{
 		int i;
 		for(i = 0; i < 4; i++)
@@ -251,6 +254,18 @@ VOID UnhookFunctionStart(PDWORD addr, PDWORD oldData)
 		}
 		doSync(addr);
 	}
+}
+
+DWORD HookFunctionStub(PDWORD _Address, void* Function) {
+	DWORD* startStub = (DWORD*)&m_hookSection[m_hookCount * 32];
+	m_hookCount++;
+
+	for (auto i = 0; i < 7; i++)
+		startStub[i] = 0x60000000;
+	startStub[7] = 0x4E800020;
+
+	HookFunctionStart(_Address, startStub, (DWORD)Function);
+	return (DWORD)startStub;
 }
 
 DWORD FindInterpretBranchOrdinal(PCHAR modname, DWORD ord, DWORD maxSearch)
@@ -557,43 +572,6 @@ HRESULT MountPath(const char* szDrive, const char* szDevice, BOOL both) {
 	return res;
 }
 
-PBYTE ReadFileToBuf(const char* szPath, PDWORD size) {
-	if(FileExists(szPath)) {
-		HANDLE hFile = CreateFile(szPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if(hFile != INVALID_HANDLE_VALUE) {
-			DWORD dwRead;
-			PBYTE buf;
-			*size = GetFileSize(hFile, NULL);
-			if(*size != 0) {
-				buf = new BYTE[*size];
-				ReadFile(hFile, buf, *size, &dwRead, NULL);
-				CloseHandle(hFile);
-				return buf;
-			}
-		}
-	}
-	return NULL;
-}
-
-BOOL WriteBufToFile(const char* szPath, PBYTE pbData, DWORD dwLen, BOOL wRemoveExisting) {
-	if(wRemoveExisting) {
-		if(FileExists(szPath))
-			DeleteFileA(szPath);
-	}
-	HANDLE hFile = CreateFile(szPath, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(hFile != INVALID_HANDLE_VALUE) {
-		DWORD dwWrote = 0;
-		DWORD currPos = 0;
-		while(dwLen > 0) {
-			WriteFile(hFile, &pbData[currPos], dwLen, &dwWrote, NULL);
-			currPos+= dwWrote;
-			dwLen -= dwWrote;
-		}
-		return TRUE;
-	}
-	return FALSE;
-}
-
 int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &refcstrDestinationDirectory) {
 	std::string		 strSource;						 // Source file
 	std::string		 strDestination;				 // Destination file
@@ -648,7 +626,7 @@ void RGLPrint(const char* category, const char* data, ...) {
 
 	va_list args;
 	va_start(args, data);
-	vprintf(infoStr.c_str(), args);
+	vprintf_s(infoStr.c_str(), args);
 	va_end(args);
 }
 
@@ -669,7 +647,7 @@ QWORD FileSize(LPCSTR filename)
 	return size.QuadPart;
 }
 
-bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size)
+BOOL ReadFile(LPCSTR filename, PVOID buffer, DWORD size)
 {
 	HANDLE file = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
@@ -685,7 +663,7 @@ bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size)
 	return true;
 }
 
-bool WriteFile(LPCSTR filename, PVOID buffer, DWORD size)
+BOOL WriteFile(LPCSTR filename, PVOID buffer, DWORD size)
 {
 	HANDLE file = CreateFile(filename, GENERIC_WRITE, NULL, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)

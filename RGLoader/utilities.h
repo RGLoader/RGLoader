@@ -47,6 +47,7 @@ DWORD ResolveFunction(char* modname, DWORD ord);
 DWORD InterpretBranchDestination(DWORD currAddr, DWORD brInst);
 VOID HookFunctionStart(PDWORD addr, PDWORD saveStub, DWORD dest);
 VOID UnhookFunctionStart(PDWORD addr, PDWORD oldData);
+DWORD HookFunctionStub(PDWORD _Address, void* Function);
 DWORD RelinkGPLR(int offset, PDWORD saveStubAddr, PDWORD orgAddr);
 DWORD FindInterpretBranch(PDWORD startAddr, DWORD maxSearch);
 DWORD FindInterpretBranchOrdinal(PCHAR modname, DWORD ord, DWORD maxSearch);
@@ -62,15 +63,13 @@ HRESULT DeleteLink(const char* szDrive, BOOL both);
 HRESULT MountPath(const char* szDrive, const char* szDevice, BOOL both);
 int DeleteDirectory(const std::string &refcstrRootDirectory, bool bDeleteSubdirectories = true);
 BOOL FileExists(const char* path);
-BOOL WriteBufToFile(const char* szPath, PBYTE pbData, DWORD dwLen, BOOL wRemoveExisting);
-PBYTE ReadFileToBuf(const char* szPath, PDWORD size);
 int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &refcstrDestinationDirectory);
 
 void RGLPrint(const char* category, const char* data, ...);
 void HexPrint(BYTE* data, DWORD len);
 QWORD FileSize(LPCSTR filename);
-bool ReadFile(LPCSTR filename, PVOID buffer, DWORD size);
-bool WriteFile(LPCSTR filename, PVOID buffer, DWORD size);
+BOOL ReadFile(LPCSTR filename, PVOID buffer, DWORD size);
+BOOL WriteFile(LPCSTR filename, PVOID buffer, DWORD size);
 
 // HANDLE RGLCreateThread(LPVOID startAddr, LPVOID parameters);
 

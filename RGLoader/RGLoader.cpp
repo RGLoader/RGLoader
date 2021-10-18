@@ -85,16 +85,6 @@ BOOL ExpansionStuff() {
 	return TRUE;
 }
 
-BOOL CPUStuff() {
-	RGLPrint("CPU", "CPU key: ");
-	BYTE CPUKeyHV[0x10];
-	HvPeekBytes(0x20, CPUKeyHV, 0x10);
-	HexPrint(CPUKeyHV, 0x10);
-	printf("\n");
-
-	return TRUE;
-}
-
 BOOL FuseStuff() {
 	QWORD fuselines[12];
 	for (int i = 0; i < 12; i++) {
@@ -166,74 +156,25 @@ void PatchBlockLIVE(){
 	memcpy((LPVOID)offsets->live_xemacs, (LPCVOID)nullStr, nullStrSize);
 }
 
+DWORD MapDebugDriveAddr = 0x91F2EF60;
+typedef VOID(*MAPDEBUGDRIVE)(const PCHAR mntName, const PCHAR mntPath, DWORD enable);
+MAPDEBUGDRIVE MapDebugDrive = (MAPDEBUGDRIVE)MapDebugDriveAddr;
+MAPDEBUGDRIVE MapDebugDriveOrig;
+
+DWORD MapInternalDrivesAddr = 0x91F2F0F8;
+typedef VOID(*MAPINTERNALDRIVES)(VOID);
+MAPINTERNALDRIVES MapInternalDrives = (MAPINTERNALDRIVES)MapInternalDrivesAddr;
+
+VOID MapDebugDriveHook(const PCHAR mntName, const PCHAR mntPath, DWORD enable) {
+	return MapDebugDriveOrig(mntName, mntPath, TRUE);
+}
+
 // Enable USBMASS0-2 in neighborhood
-void PatchMapUSB(void) {
-
-	XBDMOffsets* offsets = offsetmanager.GetXBDMOffsets();
-	if(!offsets)
-	{
-		RGLPrint("ERROR", "Failed to load XBDM offsets!\n");
-		return;
-	}
-
+void MountAllDrives(void) {
 	RGLPrint("INFO", " * Adding extra devices to xbox neighborhood\r\n");
-	DWORD MapInternalDrivesAddr = 0x91F2F0F8;
-	typedef VOID(*MAPINTERNALDRIVES)(VOID);
-	MAPINTERNALDRIVES MapInternalDrives = (MAPINTERNALDRIVES)MapInternalDrivesAddr;
-	DWORD addr = MapInternalDrivesAddr + (sizeof(DWORD) * 3); // skip three instructions from the function start
-	while(true) {
-		// grab in blocks of 6 instructions
-		DWORD inst0 = *(PDWORD)addr;  // lis r11, -0x6800
-		DWORD inst1 = *(PDWORD)(addr + sizeof(DWORD));  // lis r10, -0x6800
-		DWORD inst2 = *(PDWORD)(addr + (sizeof(DWORD) * 2));  // addi r4, r11, (stack offset)
-		DWORD inst3 = *(PDWORD)(addr + (sizeof(DWORD) * 3));  // addi r3, r10, (stack offset)
-		DWORD inst4 = *(PDWORD)(addr + (sizeof(DWORD) * 4));  // li r5, 0x0 or li r5, 0x1
-		DWORD inst5 = *(PDWORD)(addr + (sizeof(DWORD) * 5));  // bl MapDebugDrive
-		
-		// sanity checks
-		if (inst0 != 0x3D609800 || inst1 != 0x3D409800)  // lis r11, -0x6800 && lis r10, -0x6800
-			break;
-		if ((WORD)((inst2 >> 16) & 0xFFFF) != 0x388B || (WORD)((inst3 >> 16) & 0xFFFF) != 0x386A)
-			break;
-		if ((WORD)((inst5 >> 16) & 0xFFFF) != 0x4BFF)
-			break;
-		if(inst4 == 0x38A00000) // li r5, 0
-			*(PDWORD)addr = 0x38A00001;  // li r5, 1
-
-		addr += (sizeof(DWORD) * 6);
-	}
+	MapDebugDriveOrig = reinterpret_cast<MAPDEBUGDRIVE>(HookFunctionStub((PDWORD)MapDebugDriveAddr, MapDebugDriveHook));
+	// call MapInternalDrives
 	MapInternalDrives();
-
-	/* typedef VOID(*MAPDEBUGDRIVE)(PCHAR mntName, PCHAR mntPath, BYTE mntEnable);
-	MAPDEBUGDRIVE MapDebugDrive = (MAPDEBUGDRIVE)0x91F2EF60;
-
-	MapDebugDrive((PCHAR)(0x98002058 - 0x6100000), (PCHAR)(0x980008b4 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002054 - 0x6100000), (PCHAR)(0x9800094c - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002050 - 0x6100000), (PCHAR)(0x9800092c - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002048 - 0x6100000), (PCHAR)(0x98000970 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002040 - 0x6100000), (PCHAR)(0x98000904 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002038 - 0x6100000), (PCHAR)(0x98000918 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x9800202c - 0x6100000), (PCHAR)(0x98000980 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002020 - 0x6100000), (PCHAR)(0x98000990 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002014 - 0x6100000), (PCHAR)(0x980009a0 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98002008 - 0x6100000), (PCHAR)(0x980009ec - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001ffc - 0x6100000), (PCHAR)(0x98000a08 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001ff0 - 0x6100000), (PCHAR)(0x98000a30 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fe8 - 0x6100000), (PCHAR)(0x98000a58 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fdc - 0x6100000), (PCHAR)(0x98000a78 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fcc - 0x6100000), (PCHAR)(0x98000a9c - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fbc - 0x6100000), (PCHAR)(0x98000ac4 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fb4 - 0x6100000), (PCHAR)(0x98000aec - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001fa8 - 0x6100000), (PCHAR)(0x98000b0c - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f98 - 0x6100000), (PCHAR)(0x98000b30 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f88 - 0x6100000), (PCHAR)(0x98000b58 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f80 - 0x6100000), (PCHAR)(0x98000b80 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f78 - 0x6100000), (PCHAR)(0x98000b94 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f6c - 0x6100000), (PCHAR)(0x98000bac - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f5c - 0x6100000), (PCHAR)(0x98000bc0 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f50 - 0x6100000), (PCHAR)(0x98000bd8 - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f44 - 0x6100000), (PCHAR)(0x98000bfc - 0x6100000), 1);
-	MapDebugDrive((PCHAR)(0x98001f34 - 0x6100000), (PCHAR)(0x98000c20 - 0x6100000), 1); */
 }
 
 //21076
@@ -266,45 +207,24 @@ bool StrCompare(char* one, char* two, int len) {
 	return true;
 }
 
-VOID __declspec(naked) XexpLoadImageSaveVar(VOID)
-{
-	__asm{
-		li r3, 454 //make this unique for each hook
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		blr
-	}
-}
-
 NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle);
 typedef NTSTATUS (*XEXPLOADIMAGEFUN)(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle); // XexpLoadImage
+XEXPLOADIMAGEFUN XexpLoadImageOrig;
+
 int PatchHookXexLoad(void) {
-	//printf(" * Hooking xeximageload for persistant patches\n");
-	//hookImpStubDebug("xam.xex", "xboxkrnl.exe", XexLoadExecutableOrd, (DWORD)XexLoadExecutableHook);
-	//hookImpStubDebug("xam.xex", "xboxkrnl.exe", XexLoadImageOrd, (DWORD)XexLoadImageHook);
-	
 	PDWORD xexLoadHookAddr = (PDWORD)FindInterpretBranchOrdinal("xboxkrnl.exe", XexLoadImageOrd, XEXLOADIMAGE_MAX_SEARCH);
 	// InfoPrint("  - Found addr\r\n");
 	if(xexLoadHookAddr != NULL)
 	{
 		//printf("  - Applying hook at %08X  with  save @ %08X\r\n", xexLoadHookAddr, (PDWORD)XexpLoadImageSaveVar);
-		HookFunctionStart(xexLoadHookAddr, (PDWORD)XexpLoadImageSaveVar, (DWORD)XexpLoadImageHook);
+		XexpLoadImageOrig = reinterpret_cast<XEXPLOADIMAGEFUN>(HookFunctionStub(xexLoadHookAddr, XexpLoadImageHook));
 	}
 
 	return 1;
 }
 
-XEXPLOADIMAGEFUN XexpLoadImageSave = (XEXPLOADIMAGEFUN)XexpLoadImageSaveVar;
 NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle) {
-	NTSTATUS ret = XexpLoadImageSave(xexName, typeInfo, ver, modHandle);
-
-	// DWORD tid = XamGetCurrentTitleId();
-
-	// InfoPrint("New Title ID: 0x%04X\n", tid);
+	NTSTATUS ret = XexpLoadImageOrig(xexName, typeInfo, ver, modHandle);
 
 	if (ret >= 0) {
 		if (stricmp(xexName, XEXLOAD_HUD) == 0) {
@@ -445,8 +365,6 @@ BOOL Initialize(HANDLE hModule) {
 	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\HDD:");
 
 	Mount("\\Device\\Mass0", "\\System??\\Mass0:");
-	Mount("\\Device\\Mass1", "\\System??\\Mass1:");
-	Mount("\\Device\\Mass2", "\\System??\\Mass2:");
 
 	Mount("\\SystemRoot", "\\System??\\Root:");
 
@@ -456,66 +374,13 @@ BOOL Initialize(HANDLE hModule) {
 	// check for ini
 	reader = new INIReader("Mass0:\\rgloader.ini");
 	if(reader->ParseError() < 0)
-		reader = new INIReader("Mass1:\\rgloader.ini");
-	if(reader->ParseError() < 0)
-		reader = new INIReader("Mass2:\\rgloader.ini");
-	if(reader->ParseError() < 0)
 		reader = new INIReader("Hdd:\\rgloader.ini");
-
 	if(reader->ParseError() < 0) {
 		RGLPrint("ERROR", "Unable to open ini file!\r\n");
-		PatchMapUSB();
+		MountAllDrives();
 		fKeepMemory = false;
 		return FALSE;
 	}
-
-	/* DWORD dbgMemStatus;
-	if (DmGetConsoleDebugMemoryStatus(&dbgMemStatus) == XBDM_NOERR) {
-		if (dbgMemStatus == DM_CONSOLEMEMCONFIG_ADDITIONALMEMENABLED) {
-			DWORD dbgMemSize;
-			if (DmGetDebugMemorySize(&dbgMemSize) == XBDM_NOERR) {
-				if (dbgMemSize > 0) {
-					RGLPrint("XDK-GB", "0x%04X\r\n", dbgMemSize);
-					PBYTE dbgMem = (PBYTE)DmDebugAlloc(4096);
-					RGLPrint("XDK-GB", "0x%04X\r\n", dbgMem);
-					memset(dbgMem, 0xAA, 4096);
-					DmDebugFree(dbgMem);
-				}
-			}
-		}
-	} */
-
-	/*
-	char* SysExtPath = "HDD:\\Filesystems\\17489-dev\\$SystemUpdate";
-	if (FileExists(SysExtPath)) {
-		printf(" * Attemping to install system extended partion from %s\n", SysExtPath);
-
-		if (setupSysPartitions(SysExtPath) == ERROR_SEVERITY_SUCCESS)
-			printf("  -Success!\n");
-		else
-			printf("  -Failed\n");
-
-		printf(" * Fixing XAM FEATURES\n");
-#define XamFeatureEnableDisable 0x817483A8
-		((void(*)(...))XamFeatureEnableDisable)(1, 2);
-		((void(*)(...))XamFeatureEnableDisable)(1, 3);
-		((void(*)(...))XamFeatureEnableDisable)(1, 4);
-
-		((void(*)(...))XamFeatureEnableDisable)(0, 1);
-		((void(*)(...))XamFeatureEnableDisable)(0, 5);
-		((void(*)(...))XamFeatureEnableDisable)(0, 6);
-		((void(*)(...))XamFeatureEnableDisable)(0, 7);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x21);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x22);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x23);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x24);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x26);
-		((void(*)(...))XamFeatureEnableDisable)(0, 0x27);
-	}
-	else {
-		printf(" * No system extended files found, skipping..\n");
-	}
-	*/
 
 	// booleans - config
 	if (!reader->GetBoolean("Config", "NoRGLP", false))
@@ -527,8 +392,8 @@ BOOL Initialize(HANDLE hModule) {
 			RGLPrint("INFO", "RPC is enabled in the config but the expansion isn't installed!\n");
 	}
 	// booleans - expansion
-	if (reader->GetBoolean("Expansion", "MapUSBMass", false))
-		PatchMapUSB();
+	if (reader->GetBoolean("Expansion", "MountAllDrives", false))
+		MountAllDrives();
 	if (reader->GetBoolean("Expansion", "PersistentPatches", false))
 		PatchHookXexLoad();
 	if (reader->GetBoolean("Expansion", "BootAnimation", false) && FileExists("Root:\\RGL_bootanim.xex"))
@@ -548,17 +413,8 @@ BOOL Initialize(HANDLE hModule) {
 
 	RGLPrint("INFO", "Patches successfully applied!\n");
 
-	/* if(fExpansionEnabled)
-	{
-		bool ret = LoadKV("Mass0:\\rgkv.bin");
-		if(!ret) ret = LoadKV("Mass1:\\rgkv.bin");
-		if(!ret) ret = LoadKV("Mass2:\\rgkv.bin");
-		if(!ret) ret = LoadKV("Hdd:\\rgkv.bin");
-	} */
-
 	if (fExpansionEnabled) {
-		CPUStuff();
-		// FuseStuff();
+		FuseStuff();
 		KeyVaultStuff();
 
 		if (disableExpansionInstall) {
@@ -579,8 +435,25 @@ BOOL Initialize(HANDLE hModule) {
 		return TRUE;
 	}
 
-	// register for title ID changes
-	// ExRegisterThreadNotification(&xThreadReg, TRUE);
+	/*
+	// Thanks to Diamond!
+	DeleteLink("SysExt:", FALSE);
+	DeleteLink("SysAux:", FALSE);
+
+	char* extPath = "\\Device\\Harddisk0\\Partition1\\fs\\ext\\";
+	char* auxPath = "\\Device\\Harddisk0\\Partition1\\fs\\aux\\";
+
+	// create the directories used for aux/ext/flash
+	CreateDirectory("\\Device\\Harddisk0\\Partition1\\fs\\", NULL);
+	CreateDirectory(extPath, NULL);
+	CreateDirectory(auxPath, NULL);
+
+	// set paths
+	strcpy((PCHAR)0x816090A8, "\\Device\\Harddisk0\\Partition1\\fs\\ext");
+	strcpy((PCHAR)0x816090D0, "\\Device\\Harddisk0\\Partition1\\fs\\aux");
+	strcpy((PCHAR)0x816106E0, extPath);
+	strcpy((PCHAR)0x81610744, auxPath);
+	*/
 
 	// load plugins after expansion shit
 	RGLPrint("INFO", "Loading plugins...\n");

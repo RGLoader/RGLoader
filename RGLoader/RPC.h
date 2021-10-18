@@ -4,7 +4,7 @@ const char RPCAddr[] = "0.0.0.0";
 const WORD RPCPort = 10101;
 const DWORD RPCBufferSize = 2048;
 
-#define RPCDebug TRUE
+#define RPCDebug FALSE
 #if RPCDebug == TRUE
 #define RPCDebugPrint RGLPrint
 #else

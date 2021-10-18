@@ -13,7 +13,7 @@ struct XAMOffsets
 	DWORD live_xemacs;
 };
 
-struct XBDMOffsets
+/* struct XBDMOffsets
 {
 	DWORD mass0_obname_ptr; //ptr of device name
 	DWORD mass0_enable;
@@ -48,7 +48,7 @@ struct XBDMOffsets
 	// DWORD y_obname; //device name obj
 
 	DWORD map_internal_check;  //nop check drivemap internal=1 
-};
+}; */
 
 struct SIGNINOffsets
 {
@@ -76,7 +76,7 @@ class OffsetManager
 {
 	public:
 		OffsetManager();
-		XBDMOffsets* GetXBDMOffsets();
+		// XBDMOffsets* GetXBDMOffsets();
 		XAMOffsets* GetXAMOffsets();
 		SIGNINOffsets* GetSigninOffsets();
 		XSHELLOffsets* GetXShellOffsets();
