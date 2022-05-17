@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef XSHELL_H
-#define XSHELL_H
-
 #include "stdafx.h"
 #include <xbdm.h>
 #include <stdio.h>
@@ -10,7 +7,6 @@
 #include "utilities.h"
 #include "OffsetManager.h"
 #include <string>
-
 
 static char* startXex;
 static char* startPath;
@@ -22,5 +18,3 @@ static char* startPath;
 //static XSHELL_SETUP_DRIVE_LETTER Xshell_Setup_Drive_Letter = (XSHELL_SETUP_DRIVE_LETTER)XSHELL_SETUP_DRIVE_LETTER_FUNC_ADDR;
 
 int PatchXShellStartPath(std::string newpath);
-
-#endif

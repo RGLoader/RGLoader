@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef UTIL_H
-#define UTIL_H
-
 #include "stdafx.h"
 #include <string>
 //#include "XexLoadImage.h"
@@ -70,7 +67,3 @@ void HexPrint(BYTE* data, DWORD len);
 QWORD FileSize(LPCSTR filename);
 BOOL ReadFile(LPCSTR filename, PVOID buffer, DWORD size);
 BOOL WriteFile(LPCSTR filename, PVOID buffer, DWORD size);
-
-// HANDLE RGLCreateThread(LPVOID startAddr, LPVOID parameters);
-
-#endif

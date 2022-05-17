@@ -1,5 +1,5 @@
-#ifndef HVEXPANSION_H
-#define HVEXPANSION_H
+#pragma once
+
 #include "stdafx.h"
 //#include "xecrypt.h"
 #include <xstring>
@@ -43,6 +43,4 @@ BOOL DisableShadowbooting();
 BOOL LaunchXELL(LPCSTR path);
 BOOL LoadApplyHV(const char* filepath);
 BOOL LoadKeyVault(const char* filepath);
-
-#endif
 

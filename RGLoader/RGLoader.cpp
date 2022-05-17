@@ -279,7 +279,7 @@ DWORD PatchApplyBinary(string filepath) {
 
 	DWORD offset = 0;
 	DWORD patchesApplied = 0;
-	if(*(DWORD*)&patchData[offset] == 0x52474C50)  // RGLP
+	if(*(DWORD*)&patchData[offset] == RGLP_MAGIC)  // RGLP
 		offset += 4;
 	DWORD dest = *(DWORD*)&patchData[offset];
 	offset += 4;

@@ -15,10 +15,8 @@ typedef DWORD (*XEKEYSOBFUSCATE)(DWORD r3, BYTE* r4, DWORD r5, BYTE* r6, DWORD* 
 //typedef void (*XECRYPTRANDOM)(BYTE * pb, DWORD cb);
 //typedef void (*XECRYPTRC4)(const BYTE * pbKey, DWORD cbKey, BYTE * pbInpOut, DWORD cbInpOut);
 
-
 #define XAM_XeKeysUnObfuscate 0x81CC11DC //for retail profile decryption
 
 DWORD XeKeysUnObfuscateHook(DWORD r3, BYTE* r4, DWORD r5, BYTE* r6, DWORD r7);
-
 
 BOOL XamProfileCryptoHookSetup(void);

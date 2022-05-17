@@ -1,4 +1,3 @@
-
 #pragma once
 
 #ifndef HUD_H
