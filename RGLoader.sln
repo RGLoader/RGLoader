@@ -7,6 +7,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RGLoader", "RGLoader\RGLoad
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xkelib", "xkelib\xkelib.vcxproj", "{83FEF217-22EE-4768-80BF-9F48D5B4564C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9F0D80D9-57D8-4417-9511-2CC6FFDC7B42}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		21256.18|Xbox 360 = 21256.18|Xbox 360

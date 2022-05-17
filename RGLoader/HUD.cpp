@@ -3,7 +3,7 @@
 
 OffsetManager offsetmanager;
 
-HANDLE SearchForHandle(const char* mName){
+HANDLE SearchForHandle(const char* mName) {
 
 	PLDR_DATA_TABLE_ENTRY curTab = (PLDR_DATA_TABLE_ENTRY)GetModuleHandle("xboxkrnl.exe");
 	PXEX_HEADER_STRING peName;
