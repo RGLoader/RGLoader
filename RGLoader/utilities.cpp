@@ -106,15 +106,15 @@ void dprintf(const char* s, ...)
 
 DWORD ResolveFunction(char* modname, DWORD ord)
 {
-        UINT32 ptr32=0, ret=0, ptr2=0;
-        ret = XexGetModuleHandle(modname, (PHANDLE)&ptr32); //xboxkrnl.exe xam.dll?
-        if(ret == 0)
-        {
-                ret = XexGetProcedureAddress((HANDLE)ptr32, ord, &ptr2 );
-                if(ptr2 != 0)
-                        return ptr2;
-        }
-        return 0; // function not found
+    UINT32 ptr32=0, ret=0, ptr2=0;
+    ret = XexGetModuleHandle(modname, (PHANDLE)&ptr32); //xboxkrnl.exe xam.dll?
+    if(ret == 0)
+    {
+        ret = XexGetProcedureAddress((HANDLE)ptr32, ord, &ptr2 );
+        if(ptr2 != 0)
+			return ptr2;
+    }
+    return 0; // function not found
 }
 
 UINT32 __declspec(naked) HvxSetState(UINT32 mode){ //2 = protection off, 3 = protection on

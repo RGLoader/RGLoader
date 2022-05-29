@@ -98,6 +98,11 @@ BOOL FuseStuff() {
 	return TRUE;
 }
 
+HRESULT __stdcall RGLoaderCommandHandler(LPCSTR szCommand, LPSTR szResponse, DWORD cchResponse, PDM_CMDCONT pdmcc) {
+	printf("%s\n", szCommand);
+	return XBDM_NOERR;
+}
+
 BOOL KeyVaultStuff() {
 	BYTE cpuKey[0x10] = { 0 };
 	BYTE kvBuf[0x4000] = { 0 };
@@ -366,7 +371,7 @@ BOOL Initialize(HANDLE hModule) {
 
 	Mount("\\Device\\Mass0", "\\System??\\Mass0:");
 
-	Mount("\\SystemRoot", "\\System??\\Root:");
+	// Mount("\\SystemRoot", "\\System??\\Root:");
 
 	// install the expansion
 	fExpansionEnabled = (ExpansionStuff() == TRUE);
@@ -376,7 +381,7 @@ BOOL Initialize(HANDLE hModule) {
 	if(reader->ParseError() < 0)
 		reader = new INIReader("Hdd:\\rgloader.ini");
 	if(reader->ParseError() < 0) {
-		RGLPrint("ERROR", "Unable to open ini file!\r\n");
+		RGLPrint("ERROR", "Unable to open ini file!\n");
 		MountAllDrives();
 		fKeepMemory = false;
 		return FALSE;
