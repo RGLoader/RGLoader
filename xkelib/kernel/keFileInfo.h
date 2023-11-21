@@ -56,6 +56,22 @@ typedef enum _FSINFOCLASS {
 
 //  *******   structs for the data passed with the above classes when using NtSetInformationFile/NtQueryInformationFile
 
+// class FileDirectoryInformation = 0x1
+typedef struct _FILE_DIRECTORY_INFORMATION { 
+	DWORD NextEntryOffset; // 0x0 sz:0x4
+	DWORD FileIndex; // 0x4 sz:0x4
+	LARGE_INTEGER CreationTime; // 0x8 sz:0x8
+	LARGE_INTEGER LastAccessTime; // 0x10 sz:0x8
+	LARGE_INTEGER LastWriteTime; // 0x18 sz:0x8
+	LARGE_INTEGER ChangeTime; // 0x20 sz:0x8
+	LARGE_INTEGER EndOfFile; // 0x28 sz:0x8
+	LARGE_INTEGER AllocationSize; // 0x30 sz:0x8
+	DWORD FileAttributes; // 0x38 sz:0x4
+	DWORD FileNameLength; // 0x3C sz:0x4
+	char FileName[1]; // 0x40 sz:0x1
+} FILE_DIRECTORY_INFORMATION, *PFILE_DIRECTORY_INFORMATION; // size 72
+C_ASSERT(sizeof(FILE_DIRECTORY_INFORMATION) == 0x48);
+
 // class FilePositionInformation = 0xd
 typedef struct FILE_POSITION_INFORMATION { // query/set
 	LARGE_INTEGER  CurrentByteOffset;
@@ -71,15 +87,16 @@ typedef struct _FILE_BASIC_INFORMATION {
 } FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
 
 // returned by a call to 'NtQueryInformationFile' with 0x22 = FileNetworkOpenInformation
-typedef struct _FILE_NETWORK_OPEN_INFORMATION {
-	LARGE_INTEGER  CreationTime;
-	LARGE_INTEGER  LastAccessTime;
-	LARGE_INTEGER  LastWriteTime;
-	LARGE_INTEGER  ChangeTime;
-	LARGE_INTEGER  AllocationSize;
-	LARGE_INTEGER  EndOfFile;
-	DWORD  FileAttributes;
-} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
+typedef struct _FILE_NETWORK_OPEN_INFORMATION { 
+	LARGE_INTEGER CreationTime; // 0x0 sz:0x8
+	LARGE_INTEGER LastAccessTime; // 0x8 sz:0x8
+	LARGE_INTEGER LastWriteTime; // 0x10 sz:0x8
+	LARGE_INTEGER ChangeTime; // 0x18 sz:0x8
+	LARGE_INTEGER AllocationSize; // 0x20 sz:0x8
+	LARGE_INTEGER EndOfFile; // 0x28 sz:0x8
+	DWORD FileAttributes; // 0x30 sz:0x4
+} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION; // size 56
+C_ASSERT(sizeof(FILE_NETWORK_OPEN_INFORMATION) == 0x38);
 
 //  *******   structs related to FSINFOCLASS for use with NtQueryVolumeInformationFile
 

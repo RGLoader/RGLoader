@@ -59,6 +59,33 @@ typedef PVOID                           HXAMTASKOBJ, *PHXAMTASKOBJ; // Generic h
 #define XAMTASKMODIFY_PVPARAM           0x00000002
 #define XAMTASKMODIFY_ATTRIBUTES        0x00000004
 
+typedef struct _XAMTASKPROPERTIES { 
+	DWORD MiscAffinity : 1; // 0x0 bfo:0x31
+	DWORD MiscSysBackground : 1; // 0x0 bfo:0x30
+	DWORD MiscForceGround : 1; // 0x0 bfo:0x29
+	DWORD MiscSerialQueue : 1; // 0x0 bfo:0x28
+	DWORD MiscWaitOnHandle : 1; // 0x0 bfo:0x27
+	DWORD MiscOnSystemBehalf : 1; // 0x0 bfo:0x26
+	DWORD MiscOnTitleBehalf : 1; // 0x0 bfo:0x25
+	DWORD MiscFireOnce : 1; // 0x0 bfo:0x24
+	DWORD PriorityBackground : 1; // 0x0 bfo:0x23
+	DWORD PriorityHigh : 1; // 0x0 bfo:0x22
+	DWORD PriorityNormal : 1; // 0x0 bfo:0x21
+	DWORD PriorityLow : 1; // 0x0 bfo:0x20
+	DWORD PriorityForeground : 1; // 0x0 bfo:0x19
+	DWORD Reserved1 : 2; // 0x0 bfo:0x17
+	DWORD DurationVeryShort : 1; // 0x0 bfo:0x16
+	DWORD MiscCancelSubTasks : 1; // 0x0 bfo:0x15
+	DWORD MiscInprocSubTask : 1; // 0x0 bfo:0x14
+	DWORD Reserved0 : 9; // 0x0 bfo:0x5
+	DWORD TypeUI : 1; // 0x0 bfo:0x4
+	DWORD TypePeriodic : 1; // 0x0 bfo:0x3
+	DWORD TypePooled : 1; // 0x0 bfo:0x2
+	DWORD TypeDedicated : 1; // 0x0 bfo:0x1
+	DWORD TypeWait : 1; // 0x0 bfo:0x0
+} XAMTASKPROPERTIES, *PXAMTASKPROPERTIES; // size 4
+C_ASSERT(sizeof(XAMTASKPROPERTIES) == 0x4);
+
 typedef struct _XAMTASKATTRIBUTES
 {
 	DWORD                               dwProperties;

@@ -5,7 +5,7 @@
 #define XCONTENT_ROUND_UP_TO_ALIGNMENT(size)        (((size) + (XCONTENT_FILE_SYSTEM_ALIGNMENT - 1)) & (~(XCONTENT_FILE_SYSTEM_ALIGNMENT - 1)))
 #define XCONTENT_ALIGNMENT_PADDING_NEEDED(size)     (XCONTENT_ROUND_UP_TO_ALIGNMENT(size) - (size))
 
-#define XCONTENT_UNRESTRICTED_LICENSEE          ((ULONGLONG) 0xFFFFFFFFFFFFFFFFULL)
+#define XCONTENT_UNRESTRICTED_LICENSEE          ((QWORD) 0xFFFFFFFFFFFFFFFFULL)
 #define XCONTENT_LICENSE_FLAG_REQUIRE_ONLINE    0x00000001
 
 // some flags for mounting CON/LIVE/PIRS using mountCon/XamContentOpenFile
@@ -57,6 +57,25 @@
 #define XCONTENTTYPE_PODCASTVIDEO				0x00500000
 #define XCONTENTTYPE_VIRALVIDEO					0x00600000
 
+// languages for the DisplayName and Description fields
+#define XCONTENT_METADATA_LANG_ENGLISH		0
+#define XCONTENT_METADATA_LANG_JAPANESE		1
+#define XCONTENT_METADATA_LANG_GERMAN		2
+#define XCONTENT_METADATA_LANG_FRENCH		3
+#define XCONTENT_METADATA_LANG_SPANISH		4
+#define XCONTENT_METADATA_LANG_ITALIAN		5
+#define XCONTENT_METADATA_LANG_KOREAN		6
+#define XCONTENT_METADATA_LANG_CHINESE_TR	7 // chinese traditional
+#define XCONTENT_METADATA_LANG_PORTUGESE	8
+#define XCONTENT_METADATA_LANG_MAX			9
+
+// languages for the DisplayNameEx and DescriptionEx fields
+#define XCONTENT_METADATA_LANG_EX_RUSSIAN	0
+#define XCONTENT_METADATA_LANG_EX_POLISH	1
+#define XCONTENT_METADATA_LANG_EX_UNKNOWN	2
+#define XCONTENT_METADATA_LANG_EX_MAX		3
+
+
 #define XCONTENTDEVICETYPE_NONE         ((XCONTENTDEVICETYPE)0x0)
 #define XCONTENTDEVICETYPE_HDD          ((XCONTENTDEVICETYPE)0x1) // in the sdk
 #define XCONTENTDEVICETYPE_MU           ((XCONTENTDEVICETYPE)0x2) // in the sdk
@@ -88,6 +107,7 @@ typedef enum { // LICENSEE_TYPE
 	LICENSEE_TYPE_MEDIA_FLAGS = 0xE000,
 	LICENSEE_TYPE_CONSOLE_ID = 0xF000,
 };
+
 typedef enum XCONTENT_VOLUME_TYPE {
 	STFS_VOLUME = 0x0,
 	SVOD_VOLUME = 0x1,
@@ -228,9 +248,9 @@ typedef struct _XCONTENT_SIGNATURE {
 C_ASSERT(sizeof(XCONTENT_SIGNATURE) == 0x228);
 
 typedef struct _LICENSEE_BITS {
-	USHORT Type;
-	USHORT DataHi;
-	ULONG DataLo;
+	WORD Type;
+	WORD DataHi;
+	DWORD DataLo;
 	//UINT64 Type : 16; // 0x0 bfo:0x48
 	//UINT64 Data : 48; // 0x0 bfo:0x0
 } LICENSEE_BITS, *PLICENSEE_BITS; // size 8
@@ -238,7 +258,7 @@ C_ASSERT(sizeof(LICENSEE_BITS) == 0x8);
 
 typedef union _LICENSEE { 
 	LICENSEE_BITS Bits; // 0x0 sz:0x8
-	UINT64 AsULONGLONG; // 0x0 sz:0x8
+	QWORD AsULONGLONG; // 0x0 sz:0x8
 } LICENSEE, *PLICENSEE; // size 8
 C_ASSERT(sizeof(LICENSEE) == 0x8);
 
@@ -419,7 +439,7 @@ typedef struct _XCONTENT_METADATA_INSTALLER {
 C_ASSERT(sizeof(XCONTENT_METADATA_INSTALLER) == 0x15F4);
 
 typedef struct _XCONTENT_METADATA_TITLE_CONTENT { 
-	UCHAR Reserved[0x15F4]; // 0x0 sz:0x15F4
+	BYTE Reserved[0x15F4]; // 0x0 sz:0x15F4
 } XCONTENT_METADATA_TITLE_CONTENT, *PXCONTENT_METADATA_TITLE_CONTENT; // size 5620
 C_ASSERT(sizeof(XCONTENT_METADATA_TITLE_CONTENT) == 0x15F4);
 
@@ -436,7 +456,7 @@ C_ASSERT(sizeof(XCONTENT_FULL_HEADER) == 0xAD0E);
 
 // HASH STUFF
 typedef struct _STF_HASH_ENTRY { 
-	UCHAR Hash[0x14]; // 0x0 sz:0x14
+	BYTE Hash[0x14]; // 0x0 sz:0x14
 	//struct <unnamed-tag> Level0; // 0x14 sz:0x4 3 way union!!!
 	//struct <unnamed-tag> LevelN; // 0x14 sz:0x4
 	DWORD LevelAsULONG; // 0x14 sz:0x4
@@ -446,34 +466,34 @@ C_ASSERT(sizeof(STF_HASH_ENTRY) == 0x18);
 typedef struct _STF_HASH_BLOCK { 
 	STF_HASH_ENTRY Entries[0xAA]; // 0x0 sz:0xFF0
 	DWORD NumberOfCommittedBlocks; // 0xFF0 sz:0x4
-	UCHAR Padding[0xC]; // 0xFF4 sz:0xC
+	BYTE Padding[0xC]; // 0xFF4 sz:0xC
 } STF_HASH_BLOCK, *PSTF_HASH_BLOCK; // size 4096
 C_ASSERT(sizeof(STF_HASH_BLOCK) == 0x1000);
 
 typedef struct _SVOD_LEVEL0_HASH_BLOCK { 
 	SVOD_HASH_ENTRY Entries[0xCC]; // 0x0 sz:0xFF0
-	UCHAR Reserved[0x10]; // 0xFF0 sz:0x10
+	BYTE Reserved[0x10]; // 0xFF0 sz:0x10
 } SVOD_LEVEL0_HASH_BLOCK, *PSVOD_LEVEL0_HASH_BLOCK; // size 4096
 C_ASSERT(sizeof(SVOD_LEVEL0_HASH_BLOCK) == 0x1000);
 
 typedef struct _SVOD_LEVEL1_HASH_BLOCK { 
 	SVOD_HASH_ENTRY Entries[0xCB]; // 0x0 sz:0xFDC
 	SVOD_HASH_ENTRY NextFragmentHashEntry; // 0xFDC sz:0x14
-	UCHAR Reserved[0x10]; // 0xFF0 sz:0x10
+	BYTE Reserved[0x10]; // 0xFF0 sz:0x10
 } SVOD_LEVEL1_HASH_BLOCK, *PSVOD_LEVEL1_HASH_BLOCK; // size 4096
 C_ASSERT(sizeof(SVOD_LEVEL1_HASH_BLOCK) == 0x1000);
 
 typedef struct _SVOD_LEVEL0_BACKING_BLOCKS { 
 	SVOD_LEVEL0_HASH_BLOCK Level0HashBlock; // 0x0 sz:0x1000
-	UCHAR DataBlocks[0xCC000]; // 0x1000 sz:0xCC000
+	BYTE DataBlocks[0xCC000]; // 0x1000 sz:0xCC000
 } SVOD_LEVEL0_BACKING_BLOCKS, *PSVOD_LEVEL0_BACKING_BLOCKS; // size 839680
 C_ASSERT(sizeof(SVOD_LEVEL0_BACKING_BLOCKS) == 0xCD000);
 
 typedef union _STF_FILE_BOUNDS { 
 	DWORD FileSize; // 0x0 sz:0x4
 	struct{
-		USHORT FirstChildDirectoryIndex; // 0x0 sz:0x2
-		USHORT LastChildDirectoryIndex; // 0x2 sz:0x2
+		WORD FirstChildDirectoryIndex; // 0x0 sz:0x2
+		WORD LastChildDirectoryIndex; // 0x2 sz:0x2
 	} child;
 } STF_FILE_BOUNDS, *PSTF_FILE_BOUNDS; // size 4
 C_ASSERT(sizeof(STF_FILE_BOUNDS) == 0x4);
@@ -492,20 +512,20 @@ typedef union _STF_TIME_STAMP {
 C_ASSERT(sizeof(STF_TIME_STAMP) == 0x4);
 
 typedef struct _STF_DIRECTORY_ENTRY { 
-	UCHAR FileName[0x28]; // 0x0 sz:0x28
-	UCHAR FileNameLength : 6; // 0x28 bfo:0x0
-	UCHAR Contiguous : 1; // 0x28 bfo:0x6
-	UCHAR Directory : 1; // 0x28 bfo:0x7
-	UCHAR ValidDataBlocks0; // 0x29 sz:0x1
-	UCHAR ValidDataBlocks1; // 0x2A sz:0x1
-	UCHAR ValidDataBlocks2; // 0x2B sz:0x1
-	UCHAR AllocationBlocks0; // 0x2C sz:0x1
-	UCHAR AllocationBlocks1; // 0x2D sz:0x1
-	UCHAR AllocationBlocks2; // 0x2E sz:0x1
-	UCHAR FirstBlockNumber0; // 0x2F sz:0x1
-	UCHAR FirstBlockNumber1; // 0x30 sz:0x1
-	UCHAR FirstBlockNumber2; // 0x31 sz:0x1
-	USHORT DirectoryIndex; // 0x32 sz:0x2
+	BYTE FileName[0x28]; // 0x0 sz:0x28
+	BYTE FileNameLength : 6; // 0x28 bfo:0x0
+	BYTE Contiguous : 1; // 0x28 bfo:0x6
+	BYTE Directory : 1; // 0x28 bfo:0x7
+	BYTE ValidDataBlocks0; // 0x29 sz:0x1
+	BYTE ValidDataBlocks1; // 0x2A sz:0x1
+	BYTE ValidDataBlocks2; // 0x2B sz:0x1
+	BYTE AllocationBlocks0; // 0x2C sz:0x1
+	BYTE AllocationBlocks1; // 0x2D sz:0x1
+	BYTE AllocationBlocks2; // 0x2E sz:0x1
+	BYTE FirstBlockNumber0; // 0x2F sz:0x1
+	BYTE FirstBlockNumber1; // 0x30 sz:0x1
+	BYTE FirstBlockNumber2; // 0x31 sz:0x1
+	WORD DirectoryIndex; // 0x32 sz:0x2
 	union _STF_FILE_BOUNDS FileBounds; // 0x34 sz:0x4
 	union _STF_TIME_STAMP CreationTimeStamp; // 0x38 sz:0x4
 	union _STF_TIME_STAMP LastWriteTimeStamp; // 0x3C sz:0x4
@@ -593,7 +613,7 @@ typedef struct _XCONTENT_DATA_INTERNAL {
 	XUID xuid; // 0x138 sz:0x8
 	DWORD dwTitleId; // 0x140 sz:0x4
 	DWORD dwLicenseMask; // 0x144 sz:0x4
-	ULONGLONG ullContentSize; // 0x148 sz:0x8
+	QWORD ullContentSize; // 0x148 sz:0x8
 	FILETIME ftCreationTime; // 0x150 sz:0x8
 	wchar_t szTitleName[0x40]; // 0x158 sz:0x80
 	union{
@@ -616,8 +636,8 @@ typedef struct _BACKGROUND_DOWNLOAD_ITEM {
 	XMARKETPLACE_MEDIA_TYPE MediaType; // 0x0 sz:0x4
 	DWORD dwEffectiveTitleId; // 0x4 sz:0x4
 	XUID xuid; // 0x8 sz:0x8
-	UCHAR consoleId[0x5]; // 0x10 sz:0x5
-	UCHAR contentId[0x14]; // 0x15 sz:0x14
+	BYTE consoleId[0x5]; // 0x10 sz:0x5
+	BYTE contentId[0x14]; // 0x15 sz:0x14
 	DWORD dwState; // 0x2C sz:0x4
 	DWORD dwRatingId; // 0x30 sz:0x4
 	GUID mediaId; // 0x34 sz:0x10
@@ -632,5 +652,66 @@ typedef struct _BACKGROUND_DOWNLOAD_ITEM {
 	LARGE_INTEGER liDownloadSize; // 0x378 sz:0x8
 } BACKGROUND_DOWNLOAD_ITEM, *PBACKGROUND_DOWNLOAD_ITEM; // size 896
 C_ASSERT(sizeof(BACKGROUND_DOWNLOAD_ITEM) == 0x380);
+
+/* seems to be for .xcp data with a magic/sig of 4D534346 aka 'MSCF' */
+typedef struct _RC4_SHA_HEADER { 
+	BYTE Checksum[0x14]; // 0x0 sz:0x14
+	BYTE Confounder[0x8]; // 0x14 sz:0x8
+} RC4_SHA_HEADER, *PRC4_SHA_HEADER; // size 28
+C_ASSERT(sizeof(RC4_SHA_HEADER) == 0x1C);
+
+typedef struct _CFFILE { 
+	int cbFile; // 0x0 sz:0x4
+	DWORD uoffFolderStart; // 0x4 sz:0x4
+	WORD iFolder; // 0x8 sz:0x2
+	WORD date; // 0xA sz:0x2
+	WORD time; // 0xC sz:0x2
+	WORD attribs; // 0xE sz:0x2
+} CFFILE, *PCFFILE; // size 16
+C_ASSERT(sizeof(CFFILE) == 0x10);
+
+typedef struct _CFFOLDER { 
+	DWORD coffCabStart; // 0x0 sz:0x4
+	WORD cCFData; // 0x4 sz:0x2
+	SHORT typeCompress; // 0x6 sz:0x2
+} CFFOLDER, *PCFFOLDER; // size 8
+C_ASSERT(sizeof(CFFOLDER) == 0x8);
+
+typedef struct _CFFOLDER_HMAC { 
+	CFFOLDER cffolder; // 0x0 sz:0x8
+	RC4_SHA_HEADER hmac; // 0x8 sz:0x1C
+} CFFOLDER_HMAC, *PCFFOLDER_HMAC; // size 36
+C_ASSERT(sizeof(CFFOLDER_HMAC) == 0x24);
+
+typedef struct _CFRESERVE { 
+	WORD cbCFHeader; // 0x0 sz:0x2
+	BYTE cbCFFolder; // 0x2 sz:0x1
+	BYTE cbCFData; // 0x3 sz:0x1
+} CFRESERVE, *PFRESERVE; // size 4
+C_ASSERT(sizeof(CFRESERVE) == 0x4);
+
+typedef struct _CFHEADER { 
+	int sig; // 0x0 sz:0x4
+	DWORD csumHeader; // 0x4 sz:0x4
+	int cbCabinet; // 0x8 sz:0x4
+	DWORD csumFolders; // 0xC sz:0x4
+	DWORD coffFiles; // 0x10 sz:0x4
+	DWORD csumFiles; // 0x14 sz:0x4
+	WORD version; // 0x18 sz:0x2
+	WORD cFolders; // 0x1A sz:0x2
+	WORD cFiles; // 0x1C sz:0x2
+	WORD flags; // 0x1E sz:0x2
+	WORD setID; // 0x20 sz:0x2
+	WORD iCabinet; // 0x22 sz:0x2
+} CFHEADER, *PCFHEADER; // size 36
+C_ASSERT(sizeof(CFHEADER) == 0x24);
+
+typedef struct _XONLINECONTENT_HEADER { 
+	CFHEADER cfheader; // 0x0 sz:0x24
+	CFRESERVE cfreserve; // 0x24 sz:0x4
+	RC4_SHA_HEADER digestFolders; // 0x28 sz:0x1C
+	RC4_SHA_HEADER digestFiles; // 0x44 sz:0x1C
+} XONLINECONTENT_HEADER, *PXONLINECONTENT_HEADER; // size 96
+C_ASSERT(sizeof(XONLINECONTENT_HEADER) == 0x60);
 
 #endif // __XAMEXT_XCONTENT_H

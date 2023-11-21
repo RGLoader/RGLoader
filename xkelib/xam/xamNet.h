@@ -1,12 +1,30 @@
 #ifndef __XAMNET_DEFINES_H
 #define __XAMNET_DEFINES_H
 
+// 0x0001
+// #define SO_ACCEPTCONN	0x0002		// in SDK - socket has had listen()
+// #define SO_REUSEADDR		0x0004		// in SDK - allow local address reuse
 #define SO_MCASTMEMBER		0x0005 // dword (0xEFFFFFFA)
+#define SO_MCASTMEMBER_DEL	0x0006 // dword (0xEFFFFFFA)
+// #define SO_BROADCAST    	0x0020      // in SDK - permit sending of broadcast msgs
+// #define SO_LINGER       	0x0080      // in SDK - linger on close if data present
+// #define SO_SNDBUF		0x1001		// in SDK - send buffer size
+// #define SO_RCVBUF		0x1002		// in SDK - receive buffer size
+// #define SO_SNDLOWAT		0x1003		// send low-water mark
+// #define SO_RCVLOWAT		0x1004		// receive low-water mark
+// #define SO_SNDTIMEO		0x1005		// in SDK - send timeout
+// #define SO_RCVTIMEO		0x1006		// in SDK - receive timeout
+// #define	SO_ERROR		0x1007		// get error status and clear
+// #define	SO_TYPE			0x1008		// in SDK -  get socket type
 #define SO_MARKINSECURE		0x5801 // bool TRUE for insecure
 #define SO_PRIVATE			0x5802 // bool TRUE for private
 #define SO_GRANTINSECURE	0x5803 // bool TRUE for insecure
 #define SO_NOT_SURE1		0x5804 // dword 4 or 0x58 to 0x5B4 ?set SACK errorlevel?
 #define SO_EN_SACKERRL		0x5805 // dword ?4? enable SACK
+// 0xFFFB or -0x5, SO_EXCLUSIVEADDRUSE  in SDK
+// 0xFF7F or -0x81, SO_DONTLINGER in SDK
+// dash uses set 20 0x4, 1001 0x4, 4 0x4, FFFB 0x4, 1002 0x4, 
+// dash uses get 1001 0x4, 
 
 // these are in the sdk
 // #define XNET_OPTID_STARTUP_PARAMS				1
@@ -14,9 +32,9 @@
 // #define XNET_OPTID_NIC_XMIT_FRAMES				3
 // #define XNET_OPTID_NIC_RECV_BYTES				4
 // #define XNET_OPTID_NIC_RECV_FRAMES				5
-// #define XNET_OPTID_CALLER_XMIT_BYTES			6
+// #define XNET_OPTID_CALLER_XMIT_BYTES				6
 // #define XNET_OPTID_CALLER_XMIT_FRAMES			7
-// #define XNET_OPTID_CALLER_RECV_BYTES			8
+// #define XNET_OPTID_CALLER_RECV_BYTES				8
 // #define XNET_OPTID_CALLER_RECV_FRAMES			9
 #define XNET_OPTID_XPLAT_CROSS_SUBNET		0xa // min 0x4, possibly BOOL
 #define XNET_OPTID_TCP_COALESCE_MODE		0xb // BOOL* min 0x4
@@ -41,6 +59,29 @@
 // 0x2710-272f, 0x2AF8-0x2B5C, 2730, 2732, 2733, (optid&0xD0303FF)=0xD0303FF -> BaseNicGetOpt -> kernel NicGetOpt
 #define XNET_OPTID_BOUND_NIC				0x2734 // BaseModifyBoundNicDevices DWORD* min 4
 #define XNET_OPTID_DSCP_VALUE				0x2f01 // PBYTE min/max 1 
+// 		dash uses get:
+// 2AFC 	0x28	XUSER_SIGNING_INFO XNDNS
+// 2AF9 	0x4		
+// D010102 	0x24	XNADDR
+// D010108 	0x4		
+// 2B02 	0x4		
+// 2AFA 	0x48	
+// D010203 	0x30	
+// 2AFD 	0x30	
+// 2AF9 	0x4		
+// D010101 	0x6		
+// D01021A 	0x0		
+// D010211 	0x20	
+// D010217 	0x4480	
+// D01021A 	0x0		
+// D010206 	0x4		
+// 2B04 	0x4		
+// 1391 	0x10	
+// 		dash uses set:
+// D010108 	4		
+// D010204 	0x4		
+// 2AFA 	0x48	
+// D010102	0x24	
 
 typedef enum {
 	XNCALLER_INVALID = 0x0,
@@ -51,14 +92,21 @@ typedef enum {
 	NUM_XNCALLER_TYPES = 0x4,
 } XNCALLER_TYPE;
 
+typedef enum  {
+	UPNP_VALUE_TYPE_NONE = 0x0,
+	UPNP_VALUE_TYPE_I4 = 0x1,
+	UPNP_VALUE_TYPE_STRING = 0x2,
+} UPNP_VALUE_TYPE;
+
+
 #pragma pack(push, 1)
 typedef struct _XNetConfigParams
 { 
-	UCHAR abHash[0x14]; // 0x0 sz:0x14
-	UCHAR abConfounder[0x8]; // 0x14 sz:0x8
-	USHORT wszName[0x18]; // 0x1C sz:0x30
-	USHORT wFlags; // 0x4C sz:0x2
-	UCHAR abEnet[0x6]; // 0x4E sz:0x6
+	BYTE abHash[0x14]; // 0x0 sz:0x14
+	BYTE abConfounder[0x8]; // 0x14 sz:0x8
+	WORD wszName[0x18]; // 0x1C sz:0x30
+	WORD wFlags; // 0x4C sz:0x2
+	BYTE abEnet[0x6]; // 0x4E sz:0x6
 	DWORD ina; // 0x54 sz:0x4
 	DWORD inaMask; // 0x58 sz:0x4
 	DWORD inaGateway; // 0x5C sz:0x4
@@ -75,13 +123,36 @@ typedef struct _XNetConfigParams
 	DWORD inaServerLease; // 0x174 sz:0x4
 	DWORD ainaGatewaysLease[0x4]; // 0x178 sz:0x10
 	DWORD ainaDnsServersLease[0x4]; // 0x188 sz:0x10
-	UCHAR abEnetUPnP[0x6]; // 0x198 sz:0x6
-	USHORT wPortUPnP; // 0x19E sz:0x2
-	UCHAR abEnetPppoeServer[0x6]; // 0x1A0 sz:0x6
-	USHORT wPppoeSessionId; // 0x1A6 sz:0x2
-	UCHAR abReserved[0x44]; // 0x1A8 sz:0x44
+	BYTE abEnetUPnP[0x6]; // 0x198 sz:0x6
+	WORD wPortUPnP; // 0x19E sz:0x2
+	BYTE abEnetPppoeServer[0x6]; // 0x1A0 sz:0x6
+	WORD wPppoeSessionId; // 0x1A6 sz:0x2
+	BYTE abReserved[0x44]; // 0x1A8 sz:0x44
 } XNetConfigParams, *PXNetConfigParams; // size 492
+C_ASSERT(sizeof(XNetConfigParams) == 0x1EC);
+
+typedef struct _XNetConfigPppoe { 
+	char achServer[0x28]; // 0x0 sz:0x28
+	DWORD cpchService; // 0x28 sz:0x4
+	char * apchService[8]; // 0x2C sz:0x20
+	char achBuffer[0x140]; // 0x4C sz:0x140
+} XNetConfigPppoe, *PXNetConfigPppoe; // size 396
+C_ASSERT(sizeof(XNetConfigPppoe) == 0x18C);
+
+typedef struct _XNetConfigStatus { 
+	DWORD dwFlags; // 0x0 sz:0x4
+	struct in_addr ina; // 0x4 sz:0x4
+	struct in_addr inaMask; // 0x8 sz:0x4
+	struct in_addr ainaGateways[4]; // 0xC sz:0x10
+	struct in_addr ainaDnsServers[4]; // 0x1C sz:0x10
+	DWORD cConfigPppoe; // 0x2C sz:0x4
+	XNetConfigPppoe * pConfigPppoe; // 0x30 sz:0x4
+	int fConfigUPnP; // 0x34 sz:0x4
+	WORD wPortUPnP; // 0x38 sz:0x2
+} XNetConfigStatus, *PXNetConfigStatus; // size 58
+C_ASSERT(sizeof(XNetConfigStatus) == 0x3A);
 #pragma pack(pop)
+
 
 // these are found in the status bytes on a successful (return 0) XNetGetOpt(XNET_OPTID_ARP_ENTRY)
 #define XNPARP_LOOKUP_ENTRY_SUCCESS			1
@@ -196,8 +267,8 @@ extern "C" {
 	// NTAPI
 	// NetDll_WSAStartup(
 	// 	IN		XNCALLER_TYPE xnc
-    // 	IN		WORD wVersionRequested,
-    // 	OUT		LPWSADATA lpWSAData
+	// 	IN		WORD wVersionRequested,
+	// 	OUT		LPWSADATA lpWSAData
 	// );
 
 	NTSYSAPI
@@ -359,11 +430,11 @@ extern "C" {
 	NTAPI
 	NetDll_WSAGetOverlappedResult(
 		IN		XNCALLER_TYPE xnc,
-    	IN		SOCKET s,
-    	IN		LPOVERLAPPED lpOverlapped,
-    	OUT		LPDWORD lpcbTransfer,
+		IN		SOCKET s,
+		IN		LPOVERLAPPED lpOverlapped,
+		OUT		LPDWORD lpcbTransfer,
 		IN		BOOL fWait,
-    	OUT		LPDWORD lpdwFlags
+		OUT		LPDWORD lpdwFlags
 	);
 
 	NTSYSAPI
@@ -372,7 +443,7 @@ extern "C" {
 	NTAPI
 	NetDll_WSACancelOverlappedIO(
 		IN		XNCALLER_TYPE xnc,
-    	IN		SOCKET s
+		IN		SOCKET s
 	);
 
 	NTSYSAPI
@@ -552,11 +623,11 @@ extern "C" {
 	DWORD
 	NTAPI
 	NetDll_WSAWaitForMultipleEvents(
-    	IN		DWORD cEvents,
-    	IN		const WSAEVENT FAR * lphEvents,
-    	IN		BOOL fWaitAll,
-    	IN		DWORD dwTimeout,
-    	IN		BOOL fAlertable
+		IN		DWORD cEvents,
+		IN		const WSAEVENT FAR * lphEvents,
+		IN		BOOL fWaitAll,
+		IN		DWORD dwTimeout,
+		IN		BOOL fAlertable
 	);
 
 	NTSYSAPI
@@ -564,8 +635,8 @@ extern "C" {
 	int
 	NTAPI
 	NetDll___WSAFDIsSet(
-    	IN		SOCKET s,
-    	OUT		fd_set* fds
+		IN		SOCKET s,
+		OUT		fd_set* fds
 	);
 
 	NTSYSAPI
@@ -574,9 +645,9 @@ extern "C" {
 	NTAPI
 	NetDll_WSAEventSelect(
 		IN		XNCALLER_TYPE xnc,
-    	IN		SOCKET s,
-    	IN		WSAEVENT hEventObject,
-    	IN		long lNetworkEvents
+		IN		SOCKET s,
+		IN		WSAEVENT hEventObject,
+		IN		long lNetworkEvents
 	);
 
 	NTSYSAPI
@@ -624,8 +695,8 @@ extern "C" {
 	NTAPI
 	NetDll_XNetCreateKey(
 		IN		XNCALLER_TYPE xnc,
-        OUT		XNKID *pxnkid,
-        OUT		XNKEY *pxnkey
+		OUT		XNKID *pxnkid,
+		OUT		XNKEY *pxnkey
 	);
 
 	NTSYSAPI
@@ -654,8 +725,8 @@ extern "C" {
 	NetDll_XNetXnAddrToInAddr(
 		IN		XNCALLER_TYPE xnc,
 		IN		XNADDR * pxna,
-        IN		XNKID * pxnkid,
-        OUT		PIN_ADDR pina
+		IN		XNKID * pxnkid,
+		OUT		PIN_ADDR pina
 	);
 
 	NTSYSAPI
@@ -688,8 +759,8 @@ extern "C" {
 	NetDll_XNetInAddrToXnAddr(
 		IN		XNCALLER_TYPE xnc,
 		IN		IN_ADDR ina,
-        OUT		XNADDR * pxna,
-        IN		XNKID * pxnkid
+		OUT		XNADDR * pxna,
+		IN		XNKID * pxnkid
 	);
 
 	NTSYSAPI
@@ -738,7 +809,7 @@ extern "C" {
 	NTAPI
 	NetDll_XNetConnect(
 		IN		XNCALLER_TYPE xnc,
-        IN		const IN_ADDR ina
+		IN		const IN_ADDR ina
 	);
 
 	NTSYSAPI
@@ -927,6 +998,15 @@ extern "C" {
 		IN		DWORD ovl
 	);
 
+	NTSYSAPI
+	EXPORTNUM(105)
+	int
+	NTAPI
+	NetDll_XnpGetConfigStatus(
+		IN		XNCALLER_TYPE xnc,
+		IN OUT	PXNetConfigStatus pxnConfigStatus
+	);
+	
 	NTSYSAPI
 	EXPORTNUM(108)
 	int
@@ -1144,6 +1224,7 @@ extern "C" {
 	XNetLogonSetTitleID(
 		IN		DWORD dwTitleId
 	);
+
 
 #ifdef __cplusplus
 }

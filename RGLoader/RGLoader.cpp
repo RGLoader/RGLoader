@@ -1,62 +1,12 @@
-// XtweakXam.cpp : Defines the entry point for the application.
-//
-
 #include "stdafx.h"
-#include <xbdm.h>
-#include <fstream>
-#include <string>
-#include <stdio.h>
-#include "INIReader.h"
-#include "xam.h"
-#include "HUD.h"
-#include "xshell.h"
-#include "HvExpansion.h"
-#include "OffsetManager.h"
-#include "RPC.h"
-// #include "sysext.h"
 
-using namespace std;
+BOOL MountStuff() {
+	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\Hdd:");
+	// Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\HDD:");
+	Mount("\\Device\\Mass0", "\\System??\\Mass0:");
 
-static bool fKeepMemory = true;
-static bool fExpansionEnabled = false;
-static INIReader* reader;
-static OffsetManager offsetmanager;
-// static DWORD TitleID = 0;
-
-#define setmem(addr, data) { DWORD d = data; memcpy((LPVOID)addr, &d, 4);}
-
-#define XexLoadExecutableOrd 408
-#define XexLoadImageOrd 409
-#define XEXLOADIMAGE_MAX_SEARCH 9
-
-#define XEXLOAD_DASH    "\\Device\\Flash\\dash.xex"
-#define XEXLOAD_DASH2   "\\SystemRoot\\dash.xex"
-#define XEXLOAD_SIGNIN  "signin.xex"
-#define XEXLOAD_CREATE  "createprofile.xex"
-#define XEXLOAD_HUD	    "hud.xex"
-#define XEXLOAD_XSHELL  "xshell.xex"
-#define XEXLOAD_DEFAULT "default.xex"
-
-/*void setmem(DWORD addr, DWORD data) {
-	UINT64 d = data;
-	if(addr < 0x40000)
-	{
-		// hv patch
-		if(fExpansionEnabled)
-		{
-			printf("     (hv patch)\n");
-			addr = addr | 0x8000000000000000ULL;
-			BYTE* newdata = (BYTE*)XPhysicalAlloc(sizeof(DWORD), MAXULONG_PTR, 0, PAGE_READWRITE);
-			memcpy(newdata, &d, sizeof(DWORD));
-			writeHVPriv(newdata, addr, sizeof(DWORD));
-			XPhysicalFree(newdata);
-		}
-		else
-			printf("     (hv patch, but expansion didn't install :( )\n");
-	}
-	else
-		DmSetMemory((LPVOID)addr, 4, &d, NULL);
-}*/
+	return TRUE;
+}
 
 BOOL ExpansionStuff() {
 	/*
@@ -72,7 +22,7 @@ BOOL ExpansionStuff() {
 	if (HvPeekWORD(0) != 0x5E4E) {
 		// install signed and encrypted HVPP expansion
 		RGLPrint("EXPANSION", "Installing HVPP expansion...\n");
-		DWORD ret = InstallExpansion();
+		DWORD ret = InstallExpansions();
 		if (ret != ERROR_SUCCESS) {
 			RGLPrint("EXPANSION", "InstallExpansion: %04X\n", ret);
 			return FALSE;
@@ -86,28 +36,36 @@ BOOL ExpansionStuff() {
 }
 
 BOOL FuseStuff() {
-	QWORD fuselines[12];
-	for (int i = 0; i < 12; i++) {
-		fuselines[i] = HvPeekQWORD(0x8000020000020000 + (i * 0x200));
+	QWORD aqwFuses[0xC];
+
+	for (int i = 0; i < 0xC; i++) {
+		aqwFuses[i] = HvReadFuseRow(i);
 	}
+
 	for (int i = 0; i < 12; i++) {
-		HexPrint((PBYTE)&fuselines[i], 8);
-		printf("\n");
+		RGLPrint("FUSE", "0x%02X: ", i + 1);
+		HexPrint((PBYTE)&aqwFuses[i], sizeof(QWORD));
+		RGLNewLine();
 	}
+
+	QWORD aqwCpu[2];
+	aqwCpu[0] = aqwFuses[3] | aqwFuses[4];
+	aqwCpu[1] = aqwFuses[5] | aqwFuses[6];
+
+	RGLPrint("FUSE", "CPU Key: ");
+	HexPrint((PBYTE)aqwCpu, sizeof(QWORD) * 2);
+	RGLNewLine();
 
 	return TRUE;
 }
 
-HRESULT __stdcall RGLoaderCommandHandler(LPCSTR szCommand, LPSTR szResponse, DWORD cchResponse, PDM_CMDCONT pdmcc) {
-	printf("%s\n", szCommand);
-	return XBDM_NOERR;
-}
-
 BOOL KeyVaultStuff() {
-	BYTE cpuKey[0x10] = { 0 };
-	BYTE kvBuf[0x4000] = { 0 };
-	BYTE kvHash[0x14] = { 0 };
-	PBYTE kvData = kvBuf + 0x18;
+	BYTE pbCpuKey[0x10] = { 0 };
+	BYTE pbKvBuf[0x4000] = { 0 };
+	BYTE pbKvHash[0x14] = { 0 };
+	// PBYTE pbKvData = pbKvBuf + 0x18;
+
+	PKEY_VAULT pKV = (PKEY_VAULT)pbKvBuf;
 
 	// 17489/21256.18
 	QWORD ppKvAddr = 0x2000162E0;
@@ -116,20 +74,23 @@ BOOL KeyVaultStuff() {
 	QWORD pKvAddr = HvPeekQWORD(ppKvAddr);  // keyvault pointer in HV
 	// grab the CPU key and KV from the HV
 	// there's way better ways to grab the CPU key than this!
-	HvPeekBytes(0x18, cpuKey, 0x10);
+	HvPeekBytes(0x18, pbCpuKey, 0x10);
 	// grab the KV
-	HvPeekBytes(pKvAddr, kvBuf, 0x4000);
+	HvPeekBytes(pKvAddr, pbKvBuf, 0x4000);
 
 	// calculate the KV hash
-	XeCryptHmacSha(cpuKey, 0x10, kvData + 4, 0xD4, kvData + 0xE8, 0x1CF8, kvData + 0x1EE0, 0x2108, kvHash, 0x14);
+	XeCryptHmacSha(pbCpuKey, 0x10, (PBYTE)&pKV->oddFeatures, 0xD4, pKV->dvdKey, 0x1CF8, pKV->cardeaCertificate, 0x2108, pbKvHash, 0x14);
 
-	BYTE masterPub[sizeof(XECRYPT_RSAPUB_2048)];
+	// BYTE pbMasterPub[sizeof(XECRYPT_RSAPUB_2048)];
 	// master public key in the HV
-	HvPeekBytes(pMasterPub, masterPub, sizeof(XECRYPT_RSAPUB_2048));
+	// HvPeekBytes(pMasterPub, pbMasterPub, sizeof(XECRYPT_RSAPUB_2048));
 
-	RGLPrint("KV", "Console Serial: %s\n", kvBuf + 0xB0);
+	RGLPrint("KV", "Console Serial: %s\n", pKV->consoleSerialNumber);
+	RGLPrint("KV", "DVD Key: ");
+	HexPrint(pKV->dvdKey, 0x10);
+	RGLNewLine();
 
-	if (XeCryptBnDwLePkcs1Verify(kvHash, kvData + 0x1DE0, sizeof(XECRYPT_SIG)) == TRUE)
+	if (XeCryptBnDwLePkcs1Verify(pbKvHash, pKV->keyVaultSignature, sizeof(XECRYPT_SIG)) == TRUE)
 		RGLPrint("WARNING", "KV hash is valid for this console!\n");
 	else
 		RGLPrint("WARNING", "KV hash is invalid for this console!\n");
@@ -137,133 +98,36 @@ BOOL KeyVaultStuff() {
 	return TRUE;
 }
 
-void PatchBlockLIVE(){
-	RGLPrint("PROTECTIONS", " * Blocking Xbox Live DNS\r\n");
+VOID PatchBlockLIVE(){
+	RGLPrint("PROTECTIONS", " * Blocking Xbox Live DNS\n");
 
 	char* nullStr = "NO.%sNO.NO\0";
 	DWORD nullStrSize = 18;
 
-	XAMOffsets* offsets = offsetmanager.GetXAMOffsets();
-	if(!offsets)
+	// XAMOffsets* offsets = offsetmanager.GetXAMOffsets();
+	if(!RGLoader->Offsets->XAM)
 	{
-		RGLPrint("ERROR", "Failed to load DNS offsets!\r\n");
+		RGLPrint("ERROR", "Failed to load DNS offsets!\n");
 		return;
 	}
 
 	// null out xbox live dns tags
-	if(offsets->live_siflc)  //FIXME: check the others
-		memcpy( (LPVOID)offsets->live_siflc, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_piflc, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_notice, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_xexds, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_xetgs, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_xeas, (LPCVOID)nullStr, nullStrSize);
-	memcpy((LPVOID)offsets->live_xemacs, (LPCVOID)nullStr, nullStrSize);
+	if(RGLoader->Offsets->XAM->live_siflc)  //FIXME: check the others
+		memcpy( (LPVOID)RGLoader->Offsets->XAM->live_siflc, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_piflc, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_notice, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_xexds, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_xetgs, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_xeas, (LPCVOID)nullStr, nullStrSize);
+	memcpy((LPVOID)RGLoader->Offsets->XAM->live_xemacs, (LPCVOID)nullStr, nullStrSize);
 }
 
-DWORD MapDebugDriveAddr = 0x91F2EF60;
-typedef VOID(*MAPDEBUGDRIVE)(const PCHAR mntName, const PCHAR mntPath, DWORD enable);
-MAPDEBUGDRIVE MapDebugDrive = (MAPDEBUGDRIVE)MapDebugDriveAddr;
-MAPDEBUGDRIVE MapDebugDriveOrig;
-
-DWORD MapInternalDrivesAddr = 0x91F2F0F8;
-typedef VOID(*MAPINTERNALDRIVES)(VOID);
-MAPINTERNALDRIVES MapInternalDrives = (MAPINTERNALDRIVES)MapInternalDrivesAddr;
-
-VOID MapDebugDriveHook(const PCHAR mntName, const PCHAR mntPath, DWORD enable) {
-	return MapDebugDriveOrig(mntName, mntPath, TRUE);
-}
-
-// Enable USBMASS0-2 in neighborhood
-void MountAllDrives(void) {
-	RGLPrint("INFO", " * Adding extra devices to xbox neighborhood\r\n");
-	MapDebugDriveOrig = reinterpret_cast<MAPDEBUGDRIVE>(HookFunctionStub((PDWORD)MapDebugDriveAddr, MapDebugDriveHook));
-	// call MapInternalDrives
-	MapInternalDrives();
-}
-
-//21076
+// 21076
 // Changes the default dashboard
-void PatchDefaultDash(string path) {
+VOID PatchDefaultDash(string path) {
 	RGLPrint("INFO", " * Reconfiguring default dash to: %s\n", path);
 	
-	ofstream dashxbx;
-
-	//dashxbx.open("Hdd:\\Filesystems\14719-dev\dashboard.xbx", ofstream::out);
-	dashxbx.open("Root:\\dashboard.xbx", ofstream::out);
-
-	if(dashxbx.is_open()) {
-		dashxbx << path;
-		for(int i = path.length(); i < 0x100; i++)
-			dashxbx << '\0';
-		dashxbx.close();
-	} else {
-		RGLPrint("ERROR", "unable to write dashboard.xbx\n");
-	}
-}
-
-bool StrCompare(char* one, char* two, int len) {
-	for(int i = 0; i < len; i++){
-		if(i > 0 && (one[i] == '\0' || two[i] == '\0'))
-			return true; 
-		if(one[i] != two[i])
-			return false;
-	}
-	return true;
-}
-
-NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle);
-typedef NTSTATUS (*XEXPLOADIMAGEFUN)(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle); // XexpLoadImage
-XEXPLOADIMAGEFUN XexpLoadImageOrig;
-
-int PatchHookXexLoad(void) {
-	PDWORD xexLoadHookAddr = (PDWORD)FindInterpretBranchOrdinal("xboxkrnl.exe", XexLoadImageOrd, XEXLOADIMAGE_MAX_SEARCH);
-	// InfoPrint("  - Found addr\r\n");
-	if(xexLoadHookAddr != NULL)
-	{
-		//printf("  - Applying hook at %08X  with  save @ %08X\r\n", xexLoadHookAddr, (PDWORD)XexpLoadImageSaveVar);
-		XexpLoadImageOrig = reinterpret_cast<XEXPLOADIMAGEFUN>(HookFunctionStub(xexLoadHookAddr, XexpLoadImageHook));
-	}
-
-	return 1;
-}
-
-NTSTATUS XexpLoadImageHook(LPCSTR xexName, DWORD typeInfo, DWORD ver, PHANDLE modHandle) {
-	NTSTATUS ret = XexpLoadImageOrig(xexName, typeInfo, ver, modHandle);
-
-	if (ret >= 0) {
-		if (stricmp(xexName, XEXLOAD_HUD) == 0) {
-			// printf("\n\n ***RGLoader.xex*** \n   -Re-applying patches to: %s!\n\n", xexName);
-			
-			bool hudJumpToXShell = reader->GetBoolean("Expansion", "HudJumpToXShell", true);
-			if (hudJumpToXShell) {
-				// printf("     * Replacing family settings button with \"Jump to XShell\"");
-				PatchHudReturnToXShell();
-			}
-		} else if (stricmp(xexName, XEXLOAD_XSHELL) == 0) {
-			// printf("\n\n ***RGLoader.xex*** \n   -Re-applying patches to: %s!\n\n", xexName);
-	
-			string redirectXShellButton = reader->GetString("Config", "RedirectXShellButton", "none");
-			if(redirectXShellButton != "none" && FileExists(redirectXShellButton.c_str())) {
-				// printf("     * Remapping xshell start button to %s.\n\n", rTemp.c_str());
-				PatchXShellStartPath(redirectXShellButton);
-			}
-		} else if (stricmp(xexName, XEXLOAD_SIGNIN) == 0) {
-			//printf("\n\n ***RGLoader.xex*** \n   -Re-applying patches to: %s!\n", xexName);
-
-			bool noSignInNotice = reader->GetBoolean("Config", "NoSignInNotice", false);
-			if(noSignInNotice) {
-				// printf("     * Disabling xbox live sign in notice.\n\n");
-				SIGNINOffsets* offsets = offsetmanager.GetSigninOffsets();
-				if (offsets != NULL) {
-					setmem(offsets->NoSignInNotice, 0x38600000);
-				} else {
-					RGLPrint("ERROR", "Failed to load signin offsets!\r\n");
-				}
-			}
-		}
-	}
-	return ret;
+	WriteFile("Root:\\dashboard.xbx", (char*)path.c_str(), path.size());
 }
 
 DWORD PatchApplyBinary(string filepath) {
@@ -303,8 +167,27 @@ DWORD PatchApplyBinary(string filepath) {
 	return patchesApplied;
 }
 
+/* VOID FixSysAuxAndExt() {
+	// Thanks to Diamond!
+	DeleteLink("SysExt:", FALSE);
+	DeleteLink("SysAux:", FALSE);
 
-void PatchSearchBinary(void) {
+	char* extPath = "\\Device\\Harddisk0\\Partition1\\fs\\ext\\";
+	char* auxPath = "\\Device\\Harddisk0\\Partition1\\fs\\aux\\";
+
+	// create the directories used for aux/ext/flash
+	CreateDirectory("\\Device\\Harddisk0\\Partition1\\fs\\", NULL);
+	CreateDirectory(extPath, NULL);
+	CreateDirectory(auxPath, NULL);
+
+	// set paths
+	strcpy((PCHAR)0x816090A8, "\\Device\\Harddisk0\\Partition1\\fs\\ext");
+	strcpy((PCHAR)0x816090D0, "\\Device\\Harddisk0\\Partition1\\fs\\aux");
+	strcpy((PCHAR)0x816106E0, extPath);
+	strcpy((PCHAR)0x81610744, auxPath);
+} */
+
+VOID PatchSearchBinary() {
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
 
@@ -336,149 +219,132 @@ void PatchSearchBinary(void) {
 }
 
 VOID LoadPlugins() {
-	string temp = reader->GetString("Plugins", "Plugin1", "none");
-	if(temp != "none" && FileExists(temp.c_str())) {
-		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
+	if(RGLoader->Config->Plugins->Plugin1 != "none" && FileExists(RGLoader->Config->Plugins->Plugin1.c_str())) {
+		if (XexLoadImage(RGLoader->Config->Plugins->Plugin1.c_str(), XEX_MODULE_FLAG_DLL, 0, NULL))
+			RGLPrint("ERROR", "Failed to load %s", RGLoader->Config->Plugins->Plugin1.c_str());
 	}
-	temp = reader->GetString("Plugins", "Plugin2", "none");
-	if (temp != "none" && FileExists(temp.c_str())) {
-		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
+	if (RGLoader->Config->Plugins->Plugin2 != "none" && FileExists(RGLoader->Config->Plugins->Plugin2.c_str())) {
+		if (XexLoadImage(RGLoader->Config->Plugins->Plugin2.c_str(), XEX_MODULE_FLAG_DLL, 0, NULL))
+			RGLPrint("ERROR", "Failed to load %s", RGLoader->Config->Plugins->Plugin2.c_str());
 	}
-	temp = reader->GetString("Plugins", "Plugin3", "none");
-	if (temp != "none" && FileExists(temp.c_str())) {
-		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
+	if (RGLoader->Config->Plugins->Plugin3 != "none" && FileExists(RGLoader->Config->Plugins->Plugin3.c_str())) {
+		if (XexLoadImage(RGLoader->Config->Plugins->Plugin3.c_str(), XEX_MODULE_FLAG_DLL, 0, NULL))
+			RGLPrint("ERROR", "Failed to load %s", RGLoader->Config->Plugins->Plugin3.c_str());
 	}
-	temp = reader->GetString("Plugins", "Plugin4", "none");
-	if (temp != "none" && FileExists(temp.c_str())) {
-		if (XexLoadImage(temp.c_str(), 8, 0, NULL))
-			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
+	if (RGLoader->Config->Plugins->Plugin4 != "none" && FileExists(RGLoader->Config->Plugins->Plugin4.c_str())) {
+		if (XexLoadImage(RGLoader->Config->Plugins->Plugin4.c_str(), XEX_MODULE_FLAG_DLL, 0, NULL))
+			RGLPrint("ERROR", "Failed to load %s", RGLoader->Config->Plugins->Plugin4.c_str());
 	}
-	temp = reader->GetString("Plugins", "Plugin5", "none");
-	if (temp != "none" && FileExists(temp.c_str())) {
-		if(XexLoadImage(temp.c_str(), 8, 0, NULL))
-			RGLPrint("ERROR", "Failed to load %s", temp.c_str());
+	if (RGLoader->Config->Plugins->Plugin5 != "none" && FileExists(RGLoader->Config->Plugins->Plugin5.c_str())) {
+		if(XexLoadImage(RGLoader->Config->Plugins->Plugin5.c_str(), XEX_MODULE_FLAG_DLL, 0, NULL))
+			RGLPrint("ERROR", "Failed to load %s", RGLoader->Config->Plugins->Plugin5.c_str());
 	}
 }
 
-BOOL Initialize(HANDLE hModule) {
-	RGLPrint("INFO", "===RGLoader Runtime Patcher - Version 02===\n");
+void Initialize() {
+	RGLPrint("INFO", "=== RGLoader Runtime Patcher - Version 02 ===\n");
 
-	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\Hdd:");
-	Mount("\\Device\\Harddisk0\\Partition1", "\\System??\\HDD:");
+	// get power-on reason and tray state
+	SMC_PWR_REAS res = GetSmcPowerOnReason();
+	SMC_TRAY_STATE sta = GetSmcTrayState();
 
-	Mount("\\Device\\Mass0", "\\System??\\Mass0:");
+	RGLPrint("SMC", "GetSmcPowerOnReason: 0x%X\n", res);
+	RGLPrint("SMC", "GetSmcTrayState:     0x%X\n", sta);
 
-	// Mount("\\SystemRoot", "\\System??\\Root:");
+	// shutdown if console was started with eject or the tray is open
+	if(res == SMC_PWR_REAS_12_EJECT || sta == SMC_TRAY_OPEN) {
+		RGLPrint("INFO", "Console was started with eject or the tray was open, bailing!\n");
+		return;
+	}
+
+	// disable was set so exit RGL
+	if(RGLoader->Config->Disable) {
+		RGLPrint("INFO", "Disable was set in the config, bailing!\n");
+		return;
+	}
 
 	// install the expansion
-	fExpansionEnabled = (ExpansionStuff() == TRUE);
-	
-	// check for ini
-	reader = new INIReader("Mass0:\\rgloader.ini");
-	if(reader->ParseError() < 0)
-		reader = new INIReader("Hdd:\\rgloader.ini");
-	if(reader->ParseError() < 0) {
-		RGLPrint("ERROR", "Unable to open ini file!\n");
-		MountAllDrives();
-		fKeepMemory = false;
-		return FALSE;
-	}
+	RGLoader->State->ExpansionEnabled = ExpansionStuff();
 
 	// booleans - config
-	if (!reader->GetBoolean("Config", "NoRGLP", false))
+	if(!RGLoader->Config->NoRGLP)
 		PatchSearchBinary();
-	if (reader->GetBoolean("Config", "RPC", false)) {
-		if (fExpansionEnabled)
-			RPCServerStartup();
-		else
-			RGLPrint("INFO", "RPC is enabled in the config but the expansion isn't installed!\n");
-	}
 	// booleans - expansion
-	if (reader->GetBoolean("Expansion", "MountAllDrives", false))
+	if(RGLoader->Config->Expansion->MountAllDrives)
 		MountAllDrives();
-	if (reader->GetBoolean("Expansion", "PersistentPatches", false))
-		PatchHookXexLoad();
-	if (reader->GetBoolean("Expansion", "BootAnimation", false) && FileExists("Root:\\RGL_bootanim.xex"))
+	if(RGLoader->Config->Expansion->PersistentPatches)
+		KernelHooksSetup();
+	if(RGLoader->Config->Expansion->BootAnimation)
 		PatchDefaultDash("\\SystemRoot\\RGL_bootanim.xex");
-	if (reader->GetBoolean("Expansion", "RetailProfileEncryption", false))
+	if(RGLoader->Config->Expansion->ProfileEncryptionType == "retail" || RGLoader->Config->Expansion->ProfileEncryptionType == "devkit")
 		XamProfileCryptoHookSetup();
 	// booleans - protections
-	if (reader->GetBoolean("Protections", "BlockLiveDNS", false))
+	if(RGLoader->Config->Protections->BlockLiveDNS)
 		PatchBlockLIVE();
-	bool disableExpansionInstall = reader->GetBoolean("Protections", "DisableExpansionInstall", true);
-	bool disableShadowboots = reader->GetBoolean("Protections", "DisableShadowboot", true);
-	
-	// strings
-	string defaultDashboard = reader->GetString("Config", "DefaultDashboard", "none");
-	if (defaultDashboard != "none" && FileExists(defaultDashboard.c_str()))
-		PatchDefaultDash(defaultDashboard);
+	// strings - config
+	if (RGLoader->Config->DefaultDashboard != "none" && FileExists(RGLoader->Config->DefaultDashboard.c_str()))
+		PatchDefaultDash(RGLoader->Config->DefaultDashboard);
 
 	RGLPrint("INFO", "Patches successfully applied!\n");
 
-	if (fExpansionEnabled) {
+	if (RGLoader->State->ExpansionEnabled) {
 		FuseStuff();
 		KeyVaultStuff();
 
-		if (disableExpansionInstall) {
+		if (RGLoader->Config->Protections->DisableExpansionInstall) {
 			if (DisableExpansionInstalls() == TRUE)
 				RGLPrint("PROTECTIONS", "HvxExpansionInstall unpatched successfully!\n");
 		}
 
-		if (disableShadowboots) {
+		if (RGLoader->Config->Protections->DisableShadowboot) {
 			if (DisableShadowbooting() == TRUE)
 				RGLPrint("PROTECTIONS", "HvxShadowboot disabled!\n");
 		}
 	}
 
-	// skip plugin loading
-	DVD_TRAY_STATE dts = XamLoaderGetDvdTrayState();
-	if (dts == DVD_TRAY_STATE_OPENING || dts == DVD_TRAY_STATE_OPEN) {
-		RGLPrint("INFO", "Skipping RGLoader plugin init...\n");
-		return TRUE;
+	if (RGLoader->Config->RPC) {
+		RGLPrint("RPC", "RGLoader RPC started!\n");
+		DmRegisterCommandProcessor("rgloader", HrRGL);
 	}
 
-	/*
-	// Thanks to Diamond!
-	DeleteLink("SysExt:", FALSE);
-	DeleteLink("SysAux:", FALSE);
-
-	char* extPath = "\\Device\\Harddisk0\\Partition1\\fs\\ext\\";
-	char* auxPath = "\\Device\\Harddisk0\\Partition1\\fs\\aux\\";
-
-	// create the directories used for aux/ext/flash
-	CreateDirectory("\\Device\\Harddisk0\\Partition1\\fs\\", NULL);
-	CreateDirectory(extPath, NULL);
-	CreateDirectory(auxPath, NULL);
-
-	// set paths
-	strcpy((PCHAR)0x816090A8, "\\Device\\Harddisk0\\Partition1\\fs\\ext");
-	strcpy((PCHAR)0x816090D0, "\\Device\\Harddisk0\\Partition1\\fs\\aux");
-	strcpy((PCHAR)0x816106E0, extPath);
-	strcpy((PCHAR)0x81610744, auxPath);
-	*/
+	// XHTTP hooks to bypass XAUTH security
+	XamNetworkingHookSetup();
 
 	// load plugins after expansion shit
 	RGLPrint("INFO", "Loading plugins...\n");
 	LoadPlugins();
+}
+
+BOOL Shutdown() {
+	delete RGLoader;
 
 	return TRUE;
 }
 
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD dwReason, LPVOID lpReserved) {
-	if(dwReason == DLL_PROCESS_ATTACH) {
-		Initialize(hModule);
+	switch (dwReason) {
+		case DLL_PROCESS_ATTACH: {
+			// mount virtual drives
+			MountStuff();
 
-		//set load count to 1
-		if(!fKeepMemory) {
-			*(WORD*)((DWORD)hModule + 64) = 1;
-			return FALSE;
-		} else return TRUE;
+			// Initialize globals
+			RGLoader = new Globals();
+			RGLoader->State->Handle = hModule;
+
+			HANDLE hThread; DWORD hThreadID;
+			ExCreateThread(&hThread, 32 * 1024, &hThreadID, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)Initialize, NULL, 0x1C000427);
+			XSetThreadProcessor(hThread, 4);
+			ResumeThread(hThread);
+			CloseHandle(hThread);
+
+			return TRUE;
+		}
+		case DLL_PROCESS_DETACH: {
+			HalReturnToFirmware(HalFatalErrorRebootRoutine);
+			break;
+		}
 	}
-	return TRUE;
+
+	*(WORD*)((DWORD)hModule + 64) = 1;
+	return FALSE;
 }
-
-
-

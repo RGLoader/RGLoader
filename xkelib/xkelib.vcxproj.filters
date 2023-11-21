@@ -65,8 +65,26 @@
     <ClInclude Include="xam\xamNet.h">
       <Filter>Header Files\xam</Filter>
     </ClInclude>
-    <ClInclude Include="xapiext.h">
+    <ClInclude Include="kernel\keDriver.h">
       <Filter>Header Files\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="xapiext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="syssock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\keNand.h">
+      <Filter>Header Files\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\keXConfig.h">
+      <Filter>Header Files\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\kernelExpEnum.h">
+      <Filter>Header Files\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="xam\xamExpEnum.h">
+      <Filter>Header Files\xam</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

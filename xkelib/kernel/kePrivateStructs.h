@@ -16,12 +16,6 @@ typedef enum {
 	ArgonEepromAll = 0x2,
 } ARGON_EEPROM_FIELD;
 
-typedef enum {
-	DriverQuiesceRundown = 0x0,
-	DriverQuiesceStartup = 0x1,
-	DriverShutdown = 0x2,
-} _KDRIVER_NOTIFICATION_TYPE;
-
 // for KeGetCurrentProcessType()
 typedef enum  {
 	PROC_IDLE = 0,
@@ -30,7 +24,37 @@ typedef enum  {
 	PROC_DEBUG = 3,
 } _KPROC_TYPE;
 
-typedef _KPROC_TYPE		KPROCESSOR_MODE;
+typedef enum {
+	EventNotificationObject = 0x0,
+	EventSynchronizationObject = 0x1,
+	MutantObject = 0x2,
+	ProcessObject = 0x3,
+	QueueObject = 0x4,
+	SemaphoreObject = 0x5,
+	ThreadObject = 0x6,
+	Spare1Object = 0x7, // ExAcquireReadWriteLockExclusive
+	TimerNotificationObject = 0x8,
+	TimerSynchronizationObject = 0x9,
+	Spare2Object = 0xA,
+	Spare3Object = 0xB,
+	Spare4Object = 0xC,
+	Spare5Object = 0xD,
+	Spare6Object = 0xE,
+	Spare7Object = 0xF,
+	Spare8Object = 0x10,
+	Spare9Object = 0x11,
+	ApcObject = 0x12,
+	DpcObject = 0x13,
+	DeviceQueueObject = 0x14,
+	EventPairObject = 0x15,
+	InterruptObject = 0x16,
+	ProfileObject = 0x17,
+} KOBJECTS;
+
+typedef enum {
+	NotificationTimer = 0x0,
+	SynchronizationTimer = 0x1,
+} TIMER_TYPE;
 
 typedef enum {
 	Executive = 0x0,
@@ -45,49 +69,13 @@ typedef enum {
 	MaximumWaitReason = 0x9,
 } KWAIT_REASON;
 
-//NTSTATUS
-//XxxDispatchRead(
-//				IN PDEVICE_OBJECT  DeviceObject,
-//				IN PIRP  Irp
-//				);
-
-// function location in array of u32's
 typedef enum {
-	DEVICEOB_Start = 0,
-	DEVICEOB_Del,
-	DEVICEOB_Dismount,
-	DEVICEOB_FCreate,
-	DEVICEOB_FClose,
-	DEVICEOB_FRead,
-	DEVICEOB_FWrite,
-	DEVICEOB_FQuery,
-	DEVICEOB_FSet,
-	DEVICEOB_FFlush,
-	DEVICEOB_FQueryVol,
-	DEVICEOB_FDirCntrl,
-	DEVICEOB_FDevCntrl,
-	DEVICEOB_FCleanup,
-} DEVICEOB_FUNS;
+	KernelMode = 0x0,
+	UserMode = 0x1,
+	MaximumMode = 0x2,
+} WAIT_MODE;
 
-// INCOMPLETE!! DEVICE_TYPE
-#define FILE_DEVICE_CD_ROM              0x00000002 // SataCdRomDriverObject
-#define FILE_DEVICE_CD_ROM_FILE_SYSTEM  0x00000003 // OdfxDriverObject
-#define FILE_DEVICE_DISK                0x00000007 // SataDiskDriverObject
-#define FILE_DEVICE_DISK_FILE_SYSTEM    0x00000008 // nomnil FatwDriverObject FatxDriverObject RawxDriverObject HfspDriverObject
-#define FILE_DEVICE_VIRTUAL_DISK        0x00000024
-#define FILE_DEVICE_MASS_STORAGE        0x0000002d // MassIoDriverObject
-#define FILE_DEVICE_MASS1				0x0000003a // MassIoDriverObject
-#define FILE_DEVICE_MASS2				0x0000003e // MassIoDriverObject
-#define FILE_DEVICE_SFCX				0x0000003c // SfcxDriverObject
-#define FILE_DEVICE_UNK1				0x0000003d
-#define FILE_DEVICE_UNK2				0x00000040
-#define FILE_DEVICE_UNK3				0x00000041 // SfcxMuDriverObject
-#define FILE_DEVICE_UNK4				0x00000042
-#define FILE_DEVICE_UNK5				0x00000043
-#define FILE_DEVICE_MASS3				0x00000044 // MassIoDriverObject
-#define FILE_DEVICE_MASS4				0x00000045 // MassIoDriverObject
-#define FILE_DEVICE_UNK6				0x00000046
-#define FILE_DEVICE_DEV_AUTH			0x00000047 // DevAuthIoDriverObject
+typedef WAIT_MODE		KPROCESSOR_MODE;
 
 // for 32 bit version splitting/creating
 #pragma pack(push, 1)
@@ -106,6 +94,22 @@ typedef ULONG_PTR KIPI_BROADCAST_WORKER (
 	__in ULONG_PTR Argument
 	);
 typedef KIPI_BROADCAST_WORKER *PKIPI_BROADCAST_WORKER;
+
+#pragma warning(disable: 4115)
+typedef VOID (KDEFERRED_ROUTINE)(
+	IN		struct _KDPC* Dpc,
+	IN		PVOID DeferredContext OPTIONAL,
+	IN		PVOID SystemArgument1 OPTIONAL,
+	IN		PVOID SystemArgument2 OPTIONAL
+	);
+typedef KDEFERRED_ROUTINE *PKDEFERRED_ROUTINE;
+
+typedef BOOLEAN (NTAPI KSERVICE_ROUTINE)(
+	IN		struct _KINTERRUPT *Interrupt,
+	IN		PVOID ServiceContext
+	);
+typedef KSERVICE_ROUTINE *PKSERVICE_ROUTINE;
+#pragma warning(default: 4115)
 
 //typedef struct _DISPLAY_INFO{
 //	WORD timing1; // 0x0
@@ -152,27 +156,43 @@ typedef struct _D3DPRIVATE_SCALER_PARAMETERS {
 } D3DPRIVATE_SCALER_PARAMETERS, *PD3DPRIVATE_SCALER_PARAMETERS;
 
 typedef struct _DISPLAY_INFORMATION {
-	WORD						 FrontBufferWidth;
-	WORD						 FrontBufferHeight;
-	BYTE						 FrontBufferColorFormat;
-	BYTE						 FrontBufferPixelFormat;
-	D3DPRIVATE_SCALER_PARAMETERS ScalerParameters;
-	WORD						 DisplayWindowOverscanLeft;
-	WORD						 DisplayWindowOverscanTop;
-	WORD						 DisplayWindowOverscanRight;
-	WORD						 DisplayWindowOverscanBottom;
-	WORD						 DisplayWidth;
-	WORD						 DisplayHeight;
-	FLOAT						 DisplayRefreshRate;
-	DWORD						 DisplayInterlaced;
-	BYTE						 DisplayColorFormat;
-	WORD						 ActualDisplayWidth;
+	WORD						 FrontBufferWidth; // 0 sz 2
+	WORD						 FrontBufferHeight; // 0x2 sz 2
+	BYTE						 FrontBufferColorFormat; // 0x4 sz 1
+	BYTE						 FrontBufferPixelFormat; // 0x5 sz 1
+	D3DPRIVATE_SCALER_PARAMETERS ScalerParameters;  // 0x sz 2
+	WORD						 DisplayWindowOverscanLeft; // 0x sz 2
+	WORD						 DisplayWindowOverscanTop; // 0x sz 2
+	WORD						 DisplayWindowOverscanRight; // 0x sz 2
+	WORD						 DisplayWindowOverscanBottom; // 0x sz 2
+	WORD						 DisplayWidth; // 0x sz 2
+	WORD						 DisplayHeight; // 0x sz 2
+	FLOAT						 DisplayRefreshRate; // 0x sz 8
+	DWORD						 DisplayInterlaced; // 0x sz 4
+	BYTE						 DisplayColorFormat; // 0x sz 1
+	WORD						 ActualDisplayWidth; // 0x sz 2
 } DISPLAY_INFO, *PDISPLAY_INFO;
-C_ASSERT(sizeof(DISPLAY_INFO) == 88);
+C_ASSERT(sizeof(DISPLAY_INFO) == 0x58);
 
 // *********** PACKING STARTS HERE **************//
 #pragma pack(push, 1)
 // *********** PACKING STARTS HERE **************//
+
+typedef enum XboxMemoryRegionFlags{ // for MmQueryAddressProtect
+	NoAccess = 0x1,
+	ReadOnly = 0x2,
+	ReadWrite = 0x4,
+	WriteCopy = 0x8,
+	Execute = 0x10,
+	ExecuteRead = 0x20,
+	ExecuteReadWrite = 0x40,
+	ExecuteWriteCopy = 0x80,
+	Guard = 0x100,
+	NoCache = 0x200,
+	WriteCombine = 0x400,
+	UserReadOnly = 0x1000,
+	UserReadWrite = 0x2000
+};
 
 typedef struct _MM_STATISTICS{
 	DWORD Length;
@@ -205,15 +225,15 @@ typedef struct _MM_STATISTICS{
 C_ASSERT(sizeof(MM_STATISTICS) == 104);
 
 typedef struct _KINTERRUPT { 
-	PVOID ServiceRoutine; // VOID(*)() 0x0 sz:0x4
+	PKSERVICE_ROUTINE ServiceRoutine; // VOID(*)() 0x0 sz:0x4
 	PVOID ServiceContext; // 0x4 sz:0x4
 	DWORD SpinLock; // 0x8 sz:0x4
 	DWORD ServiceCount; // 0xC sz:0x4
 	BYTE BusIrql; // 0x10 sz:0x1
 	BYTE Irql; // 0x11 sz:0x1
-//	BYTE Connected : 1; // 0x12 bfo:0x7
-//	BYTE Mode : 7; // 0x12 bfo:0x0
-	BYTE ModeConnected;
+	BYTE Connected : 1; // 0x12 bfo:0x7
+	BYTE Mode : 7; // 0x12 bfo:0x0
+// 	BYTE ModeConnected;
 	BYTE TargetNumber; // 0x13 sz:0x1
 } KINTERRUPT, *PKINTERRUPT; // size 20
 C_ASSERT(sizeof(KINTERRUPT) == 0x14);
@@ -270,106 +290,105 @@ typedef struct _KTRAP_FRAME {
 } KTRAP_FRAME, *PKTRAP_FRAME; // size 448
 C_ASSERT(sizeof(KTRAP_FRAME) == 0x1C0);
 
-typedef struct _KAPC{
-	short Type;
-	BYTE ApcMode;
-	BYTE Inserted;
-	struct _KTHREAD * Thread;
-	LIST_ENTRY ApcListEntry;
-	PVOID KernelRoutine; // function ptr
-	PVOID RundownRoutine; // function ptr
-	PVOID NormalRoutine; // function ptr
-	PVOID NormalContext;
-	PVOID SystemArgument1;
-	PVOID SystemArgument2;
-} KAPC, *PKAPC; // 40
-C_ASSERT(sizeof(KAPC) == 40);
+typedef struct _KAPC { 
+	SHORT Type; // 0x0 sz:0x2
+	BYTE ApcMode; // 0x2 sz:0x1
+	BYTE Inserted; // 0x3 sz:0x1
+	struct _KTHREAD * Thread; // 0x4 sz:0x4
+	LIST_ENTRY ApcListEntry; // 0x8 sz:0x8
+	void * KernelRoutine; // 0x10 sz:0x4  function void(*)()
+	void * RundownRoutine; // 0x14 sz:0x4  function void(*)()
+	void * NormalRoutine; // 0x18 sz:0x4  function void(*)()
+	void * NormalContext; // 0x1C sz:0x4
+	void * SystemArgument1; // 0x20 sz:0x4
+	void * SystemArgument2; // 0x24 sz:0x4
+} KAPC, *PKAPC; // size 40
+C_ASSERT(sizeof(KAPC) == 0x28);
 
-typedef struct _DISPATCHER_HEADER{
-	BYTE Type;
-	BYTE Absolute;
-	BYTE ProcessType;
-	BYTE Inserted;
-	LONG SignalState;
-	LIST_ENTRY WaitListHead;
-} DISPATCHER_HEADER, *PDISPATCHER_HEADER; // 16
-C_ASSERT(sizeof(DISPATCHER_HEADER) == 16);
+typedef struct _DISPATCHER_HEADER { 
+	BYTE Type; // 0x0 sz:0x1
+	BYTE Absolute; // 0x1 sz:0x1
+	BYTE ProcessType; // 0x2 sz:0x1
+	BYTE Inserted; // 0x3 sz:0x1
+	LONG SignalState; // 0x4 sz:0x4
+	LIST_ENTRY WaitListHead; // 0x8 sz:0x8
+} DISPATCHER_HEADER, *PDISPATCHER_HEADER; // size 16
+C_ASSERT(sizeof(DISPATCHER_HEADER) == 0x10);
 
-typedef struct _KEVENT{
-	DISPATCHER_HEADER Header;
-} KEVENT, *PKEVENT; // 16
-C_ASSERT(sizeof(KEVENT) == 16);
+typedef struct _KEVENT { 
+	DISPATCHER_HEADER Header; // 0x0 sz:0x10
+} KEVENT, *PKEVENT; // size 16
+C_ASSERT(sizeof(KEVENT) == 0x10);
 
-typedef struct _KDPC{
-	short Type;
-	BYTE InsertedNumber;
-	BYTE TargetNumber;
-	LIST_ENTRY DpcListEntry;
-	PVOID DeferredRoutine; // function *
-	PVOID DeferredContext;
-	PVOID SystemArgument1;
-	PVOID SystemArgument2;
-} KDPC, *PKDPC; // 28
-C_ASSERT(sizeof(KDPC) == 28);
+typedef struct _KDPC { 
+	SHORT Type; // 0x0 sz:0x2
+	BYTE InsertedNumber; // 0x2 sz:0x1
+	BYTE TargetNumber; // 0x3 sz:0x1
+	LIST_ENTRY DpcListEntry; // 0x4 sz:0x8
+	PKDEFERRED_ROUTINE DeferredRoutine; // 0xC sz:0x4
+	void * DeferredContext; // 0x10 sz:0x4
+	void * SystemArgument1; // 0x14 sz:0x4
+	void * SystemArgument2; // 0x18 sz:0x4
+} KDPC, *PKDPC; // size 28
+C_ASSERT(sizeof(KDPC) == 0x1C);
 
-typedef struct _KWAIT_BLOCK{
-	LIST_ENTRY WaitListEntry;
-	struct _KTHREAD* Thread;
-	PVOID Object;
-	struct _KWAIT_BLOCK * NextWaitBlock;
-	WORD WaitKey;
-	WORD WaitType;
-} KWAIT_BLOCK, *PKWAIT_BLOCK; // 24
-C_ASSERT(sizeof(KWAIT_BLOCK) == 24);
+typedef struct _KWAIT_BLOCK {
+	LIST_ENTRY WaitListEntry; // 0x0 sz:0x8
+	struct _KTHREAD* Thread; // 0x8 sz:0x4
+	void * Object; // 0xC sz:0x4
+	struct _KWAIT_BLOCK * NextWaitBlock; // 0x10 sz:0x4
+	WORD WaitKey; // 0x14 sz:0x2
+	WORD WaitType; // 0x16 sz:0x2
+} KWAIT_BLOCK, *PKWAIT_BLOCK; // size 24
+C_ASSERT(sizeof(KWAIT_BLOCK) == 0x18);
 
+typedef struct _KTIMER { 
+	DISPATCHER_HEADER Header; // 0x0 sz:0x10
+	ULARGE_INTEGER DueTime; // 0x10 sz:0x8
+	LIST_ENTRY TimerListEntry; // 0x18 sz:0x8
+	PKDPC Dpc; // 0x20 sz:0x4
+	long Period; // 0x24 sz:0x4
+} KTIMER, *PKTIMER; // size 40
+C_ASSERT(sizeof(KTIMER) == 0x28);
 
-typedef struct _KTIMER{
-	DISPATCHER_HEADER Header;
-	ULARGE_INTEGER DueTime;
-	LIST_ENTRY TimerListEntry;
-	PKDPC Dpc;
-	LONG Period;
-} KTIMER, *PKTIMER; // 40
-C_ASSERT(sizeof(KTIMER) == 40);
+typedef struct _KPROCESS { 
+	DWORD ThreadListLock; // 0x0 sz:0x4
+	LIST_ENTRY ThreadListHead; // 0x4 sz:0x8
+	LONG ThreadQuantum; // 0xC sz:0x4
+	DWORD DirectoryTableBase; // 0x10 sz:0x4
+	DWORD ThreadCount; // 0x14 sz:0x4
+	BYTE IdlePriorityClass; // 0x18 sz:0x1
+	BYTE NormalPriorityClass; // 0x19 sz:0x1
+	BYTE TimeCriticalPriorityClass; // 0x1A sz:0x1
+	BYTE DisableQuantum; // 0x1B sz:0x1
+	DWORD DefaultKernelStackSize; // 0x1C sz:0x4
+	void * TlsStaticDataImage; // 0x20 sz:0x4
+	DWORD SizeOfTlsStaticData; // 0x24 sz:0x4
+	DWORD SizeOfTlsStaticDataImage; // 0x28 sz:0x4
+	WORD SizeOfTlsSlots; // 0x2C sz:0x2
+	BYTE Terminating; // 0x2E sz:0x1
+	BYTE ProcessType; // 0x2F sz:0x1
+	DWORD TlsSlotBitmap[0x8]; // 0x30 sz:0x20
+	DWORD FileObjectListLock; // 0x50 sz:0x4
+	LIST_ENTRY FileObjectListHead; // 0x54 sz:0x8
+	void * Win32DefaultHeapHandle; // 0x5C sz:0x4
+} KPROCESS, *PKPROCESS; // size 96
+C_ASSERT(sizeof(KPROCESS) == 0x60);
 
-typedef struct _KPROCESS{
-	DWORD ThreadListLock;
-	LIST_ENTRY ThreadListHead;
-	LONG ThreadQuantum;
-	DWORD DirectoryTableBase;
-	DWORD ThreadCount;
-	BYTE IdlePriorityClass;
-	BYTE NormalPriorityClass;
-	BYTE TimeCriticalPriorityClass;
-	BYTE DisableQuantum;
-	DWORD DefaultKernelStackSize;
-	PVOID TlsStaticDataImage;
-	DWORD SizeOfTlsStaticData;
-	DWORD SizeOfTlsStaticDataImage;
-	WORD SizeOfTlsSlots;
-	BYTE Terminating;
-	BYTE ProcessType;
-	DWORD TlsSlotBitmap[8];
-	DWORD FileObjectListLock;
-	LIST_ENTRY FileObjectListHead;
-	PVOID Win32DefaultHeapHandle;
-} KPROCESS, *PKPROCESS; // 96
-C_ASSERT(sizeof(KPROCESS) == 96);
+typedef struct _KSEMAPHORE { 
+	DISPATCHER_HEADER Header; // 0x0 sz:0x10
+	LONG Limit; // 0x10 sz:0x4
+} KSEMAPHORE, *PKSEMAPHORE; // size 20
+C_ASSERT(sizeof(KSEMAPHORE) == 0x14);
 
-typedef struct _KSEMAPHORE{
-	DISPATCHER_HEADER Header;
-	LONG Limit;
-} KSEMAPHORE, *PKSEMAPHORE; // 20
-C_ASSERT(sizeof(KSEMAPHORE) == 20);
-
-typedef struct _KQUEUE{
-	DISPATCHER_HEADER Header;
-	LIST_ENTRY EntryListHead;
-	DWORD CurrentCount;
-	DWORD MaximumCount;
-	LIST_ENTRY ThreadListHead;
-} KQUEUE, *PKQUEUE; // 40
-C_ASSERT(sizeof(KQUEUE) == 40);
+typedef struct _KQUEUE { 
+	DISPATCHER_HEADER Header; // 0x0 sz:0x10
+	LIST_ENTRY EntryListHead; // 0x10 sz:0x8
+	DWORD CurrentCount; // 0x18 sz:0x4
+	DWORD MaximumCount; // 0x1C sz:0x4
+	LIST_ENTRY ThreadListHead; // 0x20 sz:0x8
+} KQUEUE, *PKQUEUE; // size 40
+C_ASSERT(sizeof(KQUEUE) == 0x28);
 
 // *********** PACKING ENDS HERE **************//
 #pragma pack(pop)
@@ -489,19 +508,11 @@ typedef struct _KTHREAD {
 	double Fpr[32]; // 0x988 sz:0x100
 	KAPC TerminateApc; // 0xA88 sz:0x28
 } KTHREAD, *PKTHREAD; // size 2736
+//C_ASSERT(sizeof(KTHREAD) == 0xAB0);
 
 // *********** PACKING STARTS HERE **************//
 #pragma pack(push, 1)
 // *********** PACKING STARTS HERE **************//
-
-typedef struct _KDRIVER_NOTIFICATION_REGISTRATION { 
-	PVOID NotificationRoutine; // 0x0 sz:0x4
-	long Priority; // 0x4 sz:0x4
-	LIST_ENTRY ListEntry; // 0x8 sz:0x8
-} KDRIVER_NOTIFICATION_REGISTRATION, *PKDRIVER_NOTIFICATION_REGISTRATION; // size 16
-C_ASSERT(sizeof(KDRIVER_NOTIFICATION_REGISTRATION) == 0x10);
-
-//C_ASSERT(sizeof(KTHREAD) == 0xAB0);
 
 //KPCR is %r13 (pointer)
 //PKPCR __declspec(naked) GetThread_KPCR(VOID)
@@ -587,8 +598,9 @@ typedef struct _KPCR {
 	PDWORD ProfilerCurrent; // 0x2B8 sz:0x4
 	PDWORD ProfilerLimit; // 0x2BC sz:0x4
 	DWORD ProfilerFlags; // 0x2C0 sz:0x4
-	QWORD Contention; // 0x2C8 sz:0x8
+	QWORD Contention; // 0x2C8 sz:0x8 -> XProfilerContentionFlag 0x1
 	PDWORD MonitorProfileData; // 0x2D0 sz:0x4
+	// PcIdleThreadData 0x300
 } KPCR, *PKPCR; // size 728
 //C_ASSERT(sizeof(KPCR) == 0x2D8);
 
@@ -600,158 +612,28 @@ typedef union _KPCR_PAGE {
 	BYTE PcrAsUCHARs[4096]; // 0x0 sz:0x1000
 } KPCR_PAGE, *PKPCR_PAGE; // size 4096
 C_ASSERT(sizeof(KPCR_PAGE) == 0x1000);
-
-typedef struct _KDEVICE_QUEUE{
-	short Type;
-	BYTE Padding;
-	BYTE Busy;
-	DWORD Lock;
-	LIST_ENTRY DeviceListHead;
-} KDEVICE_QUEUE, *PKDEVICE_QUEUE; // 16
-C_ASSERT(sizeof(KDEVICE_QUEUE) == 16);
-
-typedef struct _DRIVER_OBJECT{
-	void  * DriverStartIo; // function pointers
-	void  * DriverDeleteDevice;
-	void  * DriverDismountVolume;
-	void  * MajorFunction[11];
-} DRIVER_OBJECT, *PDRIVER_OBJECT; //56
-C_ASSERT(sizeof(DRIVER_OBJECT) == 56);
-
-typedef struct _KDEVICE_QUEUE_ENTRY{
-	LIST_ENTRY DeviceListEntry;
-	DWORD SortKey;
-	BYTE Inserted;
-} KDEVICE_QUEUE_ENTRY, *PKDEVICE_QUEUE_ENTRY;
-
-typedef struct _IO_COMPLETION_CONTEXT{
-	void * Port;
-	void * Key;
-} IO_COMPLETION_CONTEXT, *PIO_COMPLETION_CONTEXT;
-C_ASSERT(sizeof(IO_COMPLETION_CONTEXT) == 8);
-
-typedef struct _DEVICE_OBJECT{
-	short Type; // 0
-	USHORT Size; // 2
-	long ReferenceCount; // 4
-	PDRIVER_OBJECT DriverObject; // 8
-	struct _DEVICE_OBJECT * MountedOrSelfDevice; // 12
-	void * CurrentIrp; // 16
-	DWORD Flags; // 20
-	void * DeviceExtension; // 24 
-	BYTE DeviceType; // 28
-	BYTE StartIoFlags; // 29
-	char StackSize; // 30
-	BYTE DeletePending; // 31
-	DWORD SectorSize; // 32
-	DWORD AlignmentRequirement; // 36
-	KDEVICE_QUEUE DeviceQueue; // 40
-	KEVENT DeviceLock; // 56
-	DWORD StartIoCount; // 72
-	DWORD StartIoKey; // 76
-} DEVICE_OBJECT, *PDEVICE_OBJECT;// 80
-C_ASSERT(sizeof(DEVICE_OBJECT) == 80);
-
-typedef struct _FILE_OBJECT{
-	short Type;
-	BYTE Flags;
-	BYTE Flags2;
-	PDEVICE_OBJECT DeviceObject;
-	void * FsContext;
-	void * FsContext2;
-	long FinalStatus;
-	LARGE_INTEGER CurrentByteOffset;
-	struct _FILE_OBJECT* RelatedFileObject;
-	PIO_COMPLETION_CONTEXT CompletionContext;
-	long LockCount;
-	KEVENT Lock;
-	KEVENT Event;
-	LIST_ENTRY ProcessListEntry;
-	LIST_ENTRY FileSystemListEntry;
-	BYTE IoPriority;
-	BYTE PoolPadding [15];
-} FILE_OBJECT, *PFILE_OBJECT;
-
-typedef struct _IO_STACK_LOCATION{
-	BYTE MajorFunction; // 0
-	BYTE MinorFunction; // 1
-	BYTE Flags; // 2
-	BYTE Control; // 3
-	union{
-		struct {
-			DWORD DesiredAccess; // 4
-			DWORD Options; // 8
-			USHORT FileAttributes; // 12
-			USHORT ShareAccess; // 14
-			PSTRING RemainingName; // 16
-		} Create;
-		struct{
-			DWORD Length;  // 4
-			union{
-				DWORD BufferOffset;
-				void* CacheBuffer;
-			};
-			LARGE_INTEGER ByteOffset;
-		} Read;
-		struct{
-			DWORD Length;  // 4
-			union{
-				DWORD BufferOffset;
-				void* CacheBuffer;
-			};
-			LARGE_INTEGER ByteOffset;
-		} Write;
-		struct{
-			DWORD Length;  // 4
-			PSTRING FileName;
-		} QueryDirectory;
-		struct{
-			DWORD Length; // 4
-			FILE_INFORMATION_CLASS FileInformationClass;
-		} QueryFile;
-		struct{
-			DWORD Length; // 4
-			FILE_INFORMATION_CLASS FileInformationClass;
-			PFILE_OBJECT FileObject;
-		} SetFile;
-		struct{
-			DWORD Length; // 4
-			FSINFOCLASS FsInformationClass;
-		} QueryVolume;
-		struct{
-			DWORD Length; // 4
-			FSINFOCLASS FsInformationClass;
-		} SetVolume;
-		struct{
-			DWORD OutputBufferLength; // 4
-			void* InputBuffer; // 8
-			DWORD InputBufferLength; // 12
-			DWORD IoControlCode; //16
-		} DeviceIoControl;
-		struct{
-			DWORD Length; // 4
-			PBYTE Buffer;
-			DWORD SectorNumber;
-			DWORD BufferOffset;
-		} SectorIo;
-		struct{
-			void* Argument1; // 4
-			void* Argument2;
-			void* Argument3;
-			void* Argument4;
-		} Others;
-	} parameters; // parameters 16
-	PDEVICE_OBJECT DeviceObject; // 20
-	PFILE_OBJECT FileObject;  // 24
-	void* CompletionRoutine; // 28 function long(*)()
-	void* Context; // 32
-} IO_STACK_LOCATION, *PIO_STACK_LOCATION; // 36
-C_ASSERT(sizeof(IO_STACK_LOCATION) == 36);
-
-
 // *********** PACKING ENDS HERE **************//
 #pragma pack(pop)
 // *********** PACKING ENDS HERE **************//
+
+typedef struct _KSPECIAL_REGISTERS { 
+	DWORD KernelDr0; // 0x0 sz:0x4
+	DWORD KernelDr1; // 0x4 sz:0x4
+	DWORD KernelDr2; // 0x8 sz:0x4
+	DWORD KernelDr3; // 0xC sz:0x4
+	DWORD KernelDr4; // 0x10 sz:0x4
+	DWORD KernelDr5; // 0x14 sz:0x4
+	DWORD KernelDr6; // 0x18 sz:0x4
+	DWORD KernelDr7; // 0x1C sz:0x4
+} KSPECIAL_REGISTERS, *PKSPECIAL_REGISTERS; // size 32
+C_ASSERT(sizeof(KSPECIAL_REGISTERS) == 0x20);
+
+typedef struct _KPROCESSOR_STATE { 
+	CONTEXT ContextFrame; // 0x0 sz:0xA40
+	KSPECIAL_REGISTERS SpecialRegisters; // 0xA40 sz:0x20
+} KPROCESSOR_STATE, *PKPROCESSOR_STATE; // size 2656
+C_ASSERT(sizeof(KPROCESSOR_STATE) == 0xA60);
+
 
 typedef struct _OBJECT_HANDLE_TABLE { 
 	LONG HandleCount; // 0x0 sz:0x4
@@ -766,48 +648,6 @@ typedef struct _OBJECT_HANDLE_TABLE {
 } OBJECT_HANDLE_TABLE, *POBJECT_HANDLE_TABLE; // size 56
 C_ASSERT(sizeof(OBJECT_HANDLE_TABLE) == 0x38);
 
-typedef struct _IRP{
-	SHORT Type; // 0
-	USHORT Size; // 2
-	DWORD Flags; // 4
-	LIST_ENTRY ThreadListEntry; // 8
-	IO_STATUS_BLOCK IoStatus; // 16
-	char StackCount; // 24
-	char CurrentLocation; // 25
-	BYTE PendingReturned; // 26
-	BYTE Cancel; // 27
-	void * UserBuffer; // 28
-	PIO_STATUS_BLOCK UserIosb; // 32
-	PKEVENT UserEvent; // 36
-	union{ // off 40
-		struct{
-			void * UserApcRoutine; // 40 function void(*)()
-			void * UserApcContext; // 44
-		} AsynchronousParameters;
-		LARGE_INTEGER AllocationSize; // 40
-	} Overlay;
-	union { // off 48
-		struct {
-			union{
-				KDEVICE_QUEUE_ENTRY DeviceQueueEntry; // 48
-				LIST_ENTRY DeviceListEntry; // 48
-				void * DriverContext[4]; // 48
-			};
-			DWORD LockedBufferLength; // 64
-			PKTHREAD Thread; // 68
-			LIST_ENTRY ListEntry; // 72
-			union{
-				PIO_STACK_LOCATION CurrentStackLocation; // 80
-				DWORD PacketType; // 80
-			};
-			PFILE_OBJECT OriginalFileObject; // 84
-		} Overlay;
-		KAPC Apc; // 48
-		void * CompletionKey; // 48
-	} Tail;
-	void * CancelRoutine; // 88 function void(*)()
-} IRP, *PIRP; // 96 - actually 92? appears the LARGE_INTEGER isn't packed here
-C_ASSERT(sizeof(IRP) == 96);
 
 
 #endif // __KEPRIVATESTRUCTS_H

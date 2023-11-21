@@ -1,7 +1,4 @@
-#include "xshell.h"
-
-using namespace std;
-
+#include "stdafx.h"
 
 VOID PatchInDashStrings(DWORD* addr, DWORD xex, DWORD path) {
 	DWORD data[4];
@@ -41,20 +38,19 @@ int PatchXShellStartPath(string nPath) {
 	startPath=new char[nPath.length()];
 	strcpy(startPath, nPath.c_str());
 
-	OffsetManager om;
-	XSHELLOffsets* offsets = om.GetXShellOffsets();
+	// XSHELLOffsets* offsets = om.GetXShellOffsets();
 
-	if(!offsets)
+	if(!RGLoader->Offsets->XSHELL)
 	{
 		printf("Failed to load xshell offsets...\r\n");
 		return -1;
 	}
 
 	//15574
-	PatchInDashStrings((DWORD*)offsets->loc1 , (DWORD)startXex, (DWORD)startPath); 
-	PatchInDashStrings((DWORD*)offsets->loc2 , (DWORD)startXex, (DWORD)startPath);
-	PatchInDashStrings((DWORD*)offsets->loc3 , (DWORD)startXex, (DWORD)startPath);
-	PatchInDashStrings((DWORD*)offsets->loc4 , (DWORD)startXex, (DWORD)startPath);
+	PatchInDashStrings((DWORD*)RGLoader->Offsets->XSHELL->loc1 , (DWORD)startXex, (DWORD)startPath);
+	PatchInDashStrings((DWORD*)RGLoader->Offsets->XSHELL->loc2 , (DWORD)startXex, (DWORD)startPath);
+	PatchInDashStrings((DWORD*)RGLoader->Offsets->XSHELL->loc3 , (DWORD)startXex, (DWORD)startPath);
+	PatchInDashStrings((DWORD*)RGLoader->Offsets->XSHELL->loc4 , (DWORD)startXex, (DWORD)startPath);
 	
 	return 1;
 }

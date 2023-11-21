@@ -1,79 +1,25 @@
-#include "utilities.h"
-#include <ppcintrinsics.h>
-#include <string>
-//#include <xfilecache.h>
+#include "stdafx.h"
 
 char m_hookSection[0x500];
 int m_hookCount;
 
-/*
-public NeighborhoodDrives(XboxConsole Console, EndianIO XMS, uint NopAddress, uint DriveTableAddress, uint MountedPackageTableAddress, uint[] XBDMRange)
-
-uint NopAddress  // line 1
-uint DriveTableAddress  // line 2
-uint MountedPackageTableAddress  // line 3
-uint[] XBDMRange
-
-dtAddress = DriveTableAddress;  // line 2
-mptAddress = MountedPackageTableAddress;  // line 3
-xbdmRange = XBDMRange;
-if (NopAddress != 0)  // line 1
-{
-	xms.SetPosition(NopAddress);
-	xms.Writer.Write(0x60000000);
+SMC_PWR_REAS GetSmcPowerOnReason() {
+	BYTE msg[0x10];
+	BYTE rsp[0x10];
+	memset(msg, 0, 0x10);
+	msg[0] = smc_poweron_type;
+	HalSendSMCMessage(msg, rsp);
+	return (SMC_PWR_REAS)rsp[1];
 }
 
-public Dictionary<string, string> GetMountedPackageDeviceNames()
-{
-	if (!HaveBeenRead) throw new Exception("NeighborhoodDrives.GetMountedPackageDeviceNames: The Neighborhood drives have not been read.");
-	var packages = new Dictionary<string, string>();
-	xms.SetPosition(mptAddress);
-	var nextAddr = xms.Reader.ReadUInt32();
-	//The first uint in the structure is a pointer to the next one. If it is the same as the original pointer, then we have reached the end of the mounted package list.
-	while (nextAddr != mptAddress)
-	{
-		xms.SetPosition(nextAddr + 0x9758);
-		var deviceName = xms.Reader.ReadString(0x40, Encoding.ASCII, true);
-		xms.SetPosition(-0x9357, SeekOrigin.Current);
-		var packageName = xms.Reader.ReadString(35, Encoding.BigEndianUnicode, true);
-		packages.Add(packageName, deviceName);
-		xms.SetPosition(nextAddr);
-		nextAddr = xms.Reader.ReadUInt32();
-	}
-	return packages;
+SMC_TRAY_STATE GetSmcTrayState() {
+	BYTE msg[0x10];
+	BYTE rsp[0x10];
+	memset(msg, 0, 0x10);
+	msg[0] = smc_query_tray;
+	HalSendSMCMessage(msg, rsp);
+	return (SMC_TRAY_STATE)rsp[1];
 }
-
-public void Write()
-{
-	if (!HaveBeenRead) throw new Exception("NeighborhoodDrives.Write: The Neighborhood drives have not been read.");
-	if (Drives.Count > 42) throw new Exception("NeighborhoodDrives.Write: There are too many drives in the list. The limit is 42.");
-	var buffer = new byte[0x764];
-	using (var bufferedWriter = new EndianWriter(new MemoryStream(buffer), EndianTypes.BigEndian))
-	{
-		Drives.ForEach(drive => {
-			//Set up the mount path first.
-			//Check if the path is located within XBDM still. If the ptr is 0, we are forcing new allocation.
-			if (drive.NeighborhoodLocationPointer == 0 || drive.NeighborhoodLocationPointer > xbdmRange[0] && drive.NeighborhoodLocationPointer < xbdmRange[1])
-			{
-				//The path is in XBDM. We want to relocate it.
-				drive.NeighborhoodLocationPointer = XDKUtilities.XamAlloc(console, 0x14100000, (uint)drive.NeighborhoodLocation.Length + 1);
-			}
-			else
-			{
-				//The path is in allocated memory. Free the old memory and make a new spot.
-				XDKUtilities.XamFree(console, drive.NeighborhoodLocationPointer);
-				drive.NeighborhoodLocationPointer = XDKUtilities.XamAlloc(console, 0x14100000, (uint)drive.NeighborhoodLocation.Length + 1);
-			}
-			drive.Write(bufferedWriter);
-			xms.SetPosition(drive.NeighborhoodLocationPointer);
-			xms.Writer.Write(drive.NeighborhoodLocation, Encoding.ASCII, 1);
-		});
-		bufferedWriter.Flush();
-	}
-	xms.SetPosition(dtAddress);
-	xms.Writer.Write(buffer);
-}
-*/
 
 void GetMountedPackages() {
 	HANDLE xbdm;
@@ -91,19 +37,6 @@ void Mount(char* dev, char* mnt)
 	ObCreateSymbolicLink(&asMount, &asDevice);
 }
 
-void dprintf(const char* s, ...)
-{
-	va_list argp;
-	char temp[512];
-
-	va_start(argp, s);
-	vsnprintf_s(temp, 512,512, s, argp);
-	va_end(argp);
-	//console.Display(temp);
-	OutputDebugStringA(temp);
-	//DbgPrint("%s", temp);
-}
-
 DWORD ResolveFunction(char* modname, DWORD ord)
 {
     UINT32 ptr32=0, ret=0, ptr2=0;
@@ -117,17 +50,9 @@ DWORD ResolveFunction(char* modname, DWORD ord)
     return 0; // function not found
 }
 
-UINT32 __declspec(naked) HvxSetState(UINT32 mode){ //2 = protection off, 3 = protection on
-	__asm {
-		li      r0, 0x7B
-		sc
-		blr
-	}
-}
-
 VOID __declspec(naked) GLPR_FUN(VOID)
 {
-	__asm{
+	__asm {
 		std     r14, -0x98(sp)
 		std     r15, -0x90(sp)
 		std     r16, -0x88(sp)
@@ -315,7 +240,7 @@ BOOL HookImpStubDebug(char* modname, char* impmodname, DWORD ord, DWORD patchAdd
 		if(ldat != NULL)
 		{
 			// use kmod info to find xex header in memory
-			PXEX_IMPORT_DESCRIPTOR imps = (PXEX_IMPORT_DESCRIPTOR)RtlImageXexHeaderField(ldat->XexHeaderBase, 0x000103FF);
+			PXEX_IMPORT_DESCRIPTOR imps = (PXEX_IMPORT_DESCRIPTOR)RtlImageXexHeaderField(ldat->XexHeaderBase, XEX_HEADER_IMPORTS);
 			if(imps != NULL)
 			{
 				char* impName = (char*)(imps+1);
@@ -358,12 +283,11 @@ BOOL HookImpStubDebug(char* modname, char* impmodname, DWORD ord, DWORD patchAdd
 }
 
 DWORD MakeBranch(DWORD branchAddr, DWORD destination, BOOL linked) {
-	return (0x48000000)|((destination-branchAddr)&0x03FFFFFF)|(DWORD)linked;
+	return (0x48000000) | ((destination-branchAddr) & 0x03FFFFFF) | (DWORD)linked;
 }
 
 void SwapEndian(BYTE* src, DWORD size)
 {
-
 	BYTE* temp = new BYTE[size];
 	for(int i = size - 4, b = 0; i >= 0; i -= 4, b += 4) {
 		*(DWORD*)&temp[b]=(DWORD)src[i];
@@ -372,19 +296,7 @@ void SwapEndian(BYTE* src, DWORD size)
 	delete[size] temp;
 }
 
-HRESULT cOzMount(const char* szDrive, const char* szDevice, const char* sysStr)
-{
-	STRING DeviceName, LinkName;
-	CHAR szDestinationDrive[MAX_PATH];
-	sprintf_s(szDestinationDrive, MAX_PATH, sysStr, szDrive);
-	RtlInitAnsiString((PANSI_STRING)&DeviceName, szDevice);
-	RtlInitAnsiString((PANSI_STRING)&LinkName, szDestinationDrive);
-	ObDeleteSymbolicLink((PANSI_STRING)&LinkName);
-	return (HRESULT)ObCreateSymbolicLink((PANSI_STRING)&LinkName, (PANSI_STRING)&DeviceName);
-}
-
 void RelaunchXShell(void) {
-
 	RGLPrint("INFO", "Thread ---------!\n");
 
 	if(KeGetCurrentProcessType() == PROC_SYSTEM) {
@@ -392,23 +304,8 @@ void RelaunchXShell(void) {
 	} else RGLPrint("INFO", "Attempting to launch xshell! Mounting drives..\n");
 
 
-	/*XFlushUtilityDrive();
-    XFileCacheInit(XFILECACHE_CLEAR_ALL,0,XFILECACHE_DEFAULT_THREAD,0,1);
-    XFileCacheShutdown();
-    XFlushUtilityDrive();*/
-
-
 	XSetLaunchData( NULL, 0 );
 	XamLoaderLaunchTitleEx("\\SystemRoot\\dash.xex", NULL, NULL, 0);
-	//XLaunchNewImage( XLAUNCH_KEYWORD_DEFAULT_APP, 0);
-
-     /*if(cOzMount("rgl:", "\\SystemRoot", "\\??\\%s")!= 0) 
-		 printf("ERROR[RGLOADER]: Error mounting drive.\n"); // for sys threads use "\\System??\\%s"
-	 if(cOzMount("rgl2:", "\\SystemRoot", "\\System??\\%s") != 0) 
-		 printf("ERROR[RGLOADER]: Error mounting drive2.\n"); // for sys threads use "\\System??\\%s"
-
-	 XLaunchNewImage("rgl2:\\dash.xex", 0);
-     XLaunchNewImage("rgl:\\dash.xex", 0);*/
 
 }
      
@@ -416,108 +313,17 @@ void LaunchXShell(void)
 {
     if(KeGetCurrentProcessType() == PROC_SYSTEM)
     {
-		/*HMODULE handle = GetModuleHandle("hud.xex");
-		if(!handle) printf("ERROR[RGLOADER]: Could not get handle to hud.xex\n");
-		else{
-			printf("[RGLOADER]: Freeing Hud.xex library\n");
-			FreeLibraryAndExitThread(handle, 1);
-		}*/
 		RGLPrint("INFO", "System thread, attempting to launch xshell.\n");
 		XSetLaunchData( NULL, 0 );
 
 		//XamLoaderLaunchTitleEx("\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector\\DashSelector.xex", "\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector", NULL, 0);
 		XamLoaderLaunchTitleEx("\\Device\\Flash\\xshell.xex", "\\Device\\Flash", NULL, 0);
-
-		/*printf("[RGLOADER]: System thread, creating retail thread to launch xshell.\n");
-        HANDLE hThread;
-        DWORD dwThreadId;
-        hThread = CreateThread( 0, 0, (LPTHREAD_START_ROUTINE)reLaunchXshell, 0, CREATE_SUSPENDED, &dwThreadId );
-		printf("[RGLOADER]: System thread, setting processor.\n");
-        XSetThreadProcessor(hThread, 4);
-		SetThreadPriority(hThread, THREAD_PRIORITY_TIME_CRITICAL);
-		printf("[RGLOADER]: System thread, resuming thread.\n");
-        ResumeThread(hThread);
-		printf("[RGLOADER]: System thread, closing handle.\n");
-        CloseHandle(hThread);*/
     }
     else
     {
-		RGLPrint("INFO", "Launching xshell!");
+		RGLPrint("INFO", "Launching xshell!\n");
         RelaunchXShell();
     }
-}
-
-int DeleteDirectory(const std::string &refcstrRootDirectory, bool bDeleteSubdirectories) {
-	bool            bSubdirectory = false;       // Flag, indicating whether
-												// subdirectories have been found
-	HANDLE          hFile;                       // Handle to directory
-	std::string     strFilePath;                 // Filepath
-	std::string     strPattern;                  // Pattern
-	WIN32_FIND_DATA FileInformation;             // File information
-
-
-	strPattern = refcstrRootDirectory + "\\*.*";
-	hFile = ::FindFirstFile(strPattern.c_str(), &FileInformation);
-	if(hFile != INVALID_HANDLE_VALUE) {
-		do {
-			if(FileInformation.cFileName[0] != '.') {
-				strFilePath.erase();
-				strFilePath = refcstrRootDirectory + "\\" + FileInformation.cFileName;
-
-				if(FileInformation.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-					if(bDeleteSubdirectories) {
-						// Delete subdirectory
-						int iRC = DeleteDirectory(strFilePath, bDeleteSubdirectories);
-						if(iRC)
-							return iRC;
-					}
-					else
-						bSubdirectory = true;
-				}
-				else {
-					// Set file attributes
-					if(::SetFileAttributes(strFilePath.c_str(), FILE_ATTRIBUTE_NORMAL) == FALSE)
-					return ::GetLastError();
-
-					// Delete file
-					if(::DeleteFile(strFilePath.c_str()) == FALSE)
-					return ::GetLastError();
-				}
-			}
-		} while(::FindNextFile(hFile, &FileInformation) == TRUE);
-
-		// Close handle
-		::FindClose(hFile);
-
-		DWORD dwError = ::GetLastError();
-		if(dwError != ERROR_NO_MORE_FILES)
-			return dwError;
-		else {
-			if(!bSubdirectory) {
-				// Set directory attributes
-				if(::SetFileAttributes(refcstrRootDirectory.c_str(), FILE_ATTRIBUTE_NORMAL) == FALSE)
-					return ::GetLastError();
-
-				// Delete directory
-				if(::RemoveDirectory(refcstrRootDirectory.c_str()) == FALSE)
-					return ::GetLastError();
-			}
-		}
-	}
-
-	return 0;
-}
-
-BOOL FileExists(const char* path)
-{
-	HANDLE file = CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(file == INVALID_HANDLE_VALUE) {
-		if(GetLastError() != 5) // inaccessible means it exists but is probably open somewhere else
-			return FALSE;
-	}
-	else
-		CloseHandle(file);
-	return TRUE;
 }
 
 HRESULT DoDeleteLink(const char* szDrive, const char* sysStr)
@@ -572,11 +378,70 @@ HRESULT MountPath(const char* szDrive, const char* szDevice, BOOL both) {
 	return res;
 }
 
-int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &refcstrDestinationDirectory) {
-	std::string		 strSource;						 // Source file
-	std::string		 strDestination;				 // Destination file
-	std::string		 strPattern;					 // Pattern
-	HANDLE					hFile;				     // Handle to file
+int DeleteDirectory(const string& refcstrRootDirectory, bool bDeleteSubdirectories) {
+	bool            bSubdirectory = false;       // Flag, indicating whether
+												// subdirectories have been found
+	HANDLE          hFile;                       // Handle to directory
+	string     strFilePath;                 // Filepath
+	string     strPattern;                  // Pattern
+	WIN32_FIND_DATA FileInformation;             // File information
+
+
+	strPattern = refcstrRootDirectory + "\\*.*";
+	hFile = ::FindFirstFile(strPattern.c_str(), &FileInformation);
+	if (hFile != INVALID_HANDLE_VALUE) {
+		do {
+			if (FileInformation.cFileName[0] != '.') {
+				strFilePath.erase();
+				strFilePath = refcstrRootDirectory + "\\" + FileInformation.cFileName;
+
+				if (FileInformation.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+					if (bDeleteSubdirectories) {
+						// Delete subdirectory
+						int iRC = DeleteDirectory(strFilePath, bDeleteSubdirectories);
+						if (iRC)
+							return iRC;
+					} else
+						bSubdirectory = true;
+				} else {
+					// Set file attributes
+					if (::SetFileAttributes(strFilePath.c_str(), FILE_ATTRIBUTE_NORMAL) == FALSE)
+						return ::GetLastError();
+
+					// Delete file
+					if (::DeleteFile(strFilePath.c_str()) == FALSE)
+						return ::GetLastError();
+				}
+			}
+		} while (::FindNextFile(hFile, &FileInformation) == TRUE);
+
+		// Close handle
+		::FindClose(hFile);
+
+		DWORD dwError = ::GetLastError();
+		if (dwError != ERROR_NO_MORE_FILES)
+			return dwError;
+		else {
+			if (!bSubdirectory) {
+				// Set directory attributes
+				if (::SetFileAttributes(refcstrRootDirectory.c_str(), FILE_ATTRIBUTE_NORMAL) == FALSE)
+					return ::GetLastError();
+
+				// Delete directory
+				if (::RemoveDirectory(refcstrRootDirectory.c_str()) == FALSE)
+					return ::GetLastError();
+			}
+		}
+	}
+
+	return 0;
+}
+
+int CopyDirectory(const string &refcstrSourceDirectory, const string &refcstrDestinationDirectory) {
+	string strSource;						 // Source file
+	string strDestination;				 // Destination file
+	string strPattern;					 // Pattern
+	HANDLE      hFile;				     // Handle to file
 	WIN32_FIND_DATA FileInformation;				 // File information
 
 	strPattern = refcstrSourceDirectory + "\\*.*";
@@ -618,28 +483,91 @@ int CopyDirectory(const std::string &refcstrSourceDirectory, const std::string &
 	return 0;
 }
 
-void RGLPrint(const char* category, const char* data, ...) {
-	std::string infoStr("[RGLoader] [");
-	infoStr.append(category);
-	infoStr.append("] ");
-	infoStr.append(data);
-
+void RGLPrint(const PCHAR cat, const PCHAR fmt, ...) {
+	CHAR pcBuf1[512] = { 0 };
 	va_list args;
-	va_start(args, data);
-	vprintf_s(infoStr.c_str(), args);
+	va_start(args, fmt);
+	RtlVsnprintf(pcBuf1, 512, fmt, args);
 	va_end(args);
+	
+	char pcBuf2[512] = { 0 };
+	RtlSprintf(pcBuf2, "[RGLoader] [%s] %s", cat, pcBuf1);
+
+	OutputDebugStringA(pcBuf2);
 }
 
-void HexPrint(BYTE* data, DWORD len) {
-	for (int i = 0; i < len; i++) {
-		printf("%02X", data[i]);
+void RGLNewLine() {
+	OutputDebugStringA("\n");
+}
+
+void HexPrint(PBYTE pbData, DWORD dwLen) {
+	PCHAR pcBuf = (PCHAR)malloc((dwLen * 2) + 1);
+	memset(pcBuf, 0, (dwLen * 2) + 1);
+	for (int i = 0; i < dwLen; i++) {
+		RtlSprintf(&pcBuf[i * 2], "%02X", pbData[i]);
 	}
+	OutputDebugStringA(pcBuf);
+	free(pcBuf);
 }
 
-QWORD FileSize(LPCSTR filename)
+void RGLHexPrint(const PCHAR cat, PBYTE pbData, DWORD dwLen) {
+	CHAR pcBuf[64] = { 0 };
+	RtlSprintf(pcBuf, "[RGLoader] [%s] ", cat);
+	OutputDebugStringA(pcBuf);
+	HexPrint(pbData, dwLen);
+	RGLNewLine();
+}
+
+string PathJoin(const string& szPath0, const string& szPath1) {
+	string szPath0_0 = szPath0;
+	string szPath1_0 = szPath1;
+
+	// remove path separator from end of szPath0
+	if (szPath0_0.back() == '\\' || szPath0_0.back() == '/') {
+		szPath0_0 = szPath0_0.substr(0, szPath0_0.size() - 1);
+	}
+	// remove path separator from beginning of szPath1
+	if (szPath1_0.front() == '\\' || szPath1_0.front() == '/') {
+		szPath1_0 = szPath1_0.substr(1);
+	}
+	szPath0_0 += '\\';
+	szPath0_0 += szPath1;
+	return szPath0_0;
+}
+
+vector<string> ListFiles(const string& szPathWithPattern) {
+	vector<string> vFiles;
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind;
+
+	hFind = FindFirstFile(szPathWithPattern.c_str(), &FindFileData);
+	while (hFind != INVALID_HANDLE_VALUE) {
+		vFiles.push_back(FindFileData.cFileName);
+
+		if (!FindNextFile(hFind, &FindFileData))
+			hFind = INVALID_HANDLE_VALUE;
+	}
+	return vFiles;
+}
+
+BOOL FileExists(LPCSTR szPath) {
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	if (!GetFileAttributesExA(szPath, GetFileExInfoStandard, &fad))
+		return FALSE; // error condition, could call GetLastError to find out more
+	return TRUE;
+}
+
+BOOL DirectoryExists(LPCSTR szPath) {
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	if (!GetFileAttributesEx(szPath, GetFileExInfoStandard, &fad))
+		return FALSE; // error condition, could call GetLastError to find out more
+	return (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+LONGLONG FileSize(LPCSTR szPath)
 {
 	WIN32_FILE_ATTRIBUTE_DATA fad;
-	if (GetFileAttributesEx(filename, GetFileExInfoStandard, &fad) == FALSE)
+	if (!GetFileAttributesEx(szPath, GetFileExInfoStandard, &fad))
 		return -1; // error condition, could call GetLastError to find out more
 	LARGE_INTEGER size;
 	size.HighPart = fad.nFileSizeHigh;
@@ -647,9 +575,9 @@ QWORD FileSize(LPCSTR filename)
 	return size.QuadPart;
 }
 
-BOOL ReadFile(LPCSTR filename, PVOID buffer, DWORD size)
+BOOL ReadFile(LPCSTR path, PVOID buffer, DWORD size)
 {
-	HANDLE file = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE file = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
 	{
 		// InfoPrint("Couldn't open %s\n", filename);
@@ -659,32 +587,62 @@ BOOL ReadFile(LPCSTR filename, PVOID buffer, DWORD size)
 	ReadFile(file, buffer, size, &noBytesRead, NULL);
 	CloseHandle(file);
 	if (noBytesRead <= 0)
-		return false;
-	return true;
+		return FALSE;
+	return TRUE;
 }
 
-BOOL WriteFile(LPCSTR filename, PVOID buffer, DWORD size)
+BOOL WriteFile(LPCSTR path, PVOID buffer, DWORD size)
 {
-	HANDLE file = CreateFile(filename, GENERIC_WRITE, NULL, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE file = CreateFile(path, GENERIC_WRITE, NULL, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
 	{
 		// InfoPrint("Couldn't open %s\n", filename);
-		return false;
+		return FALSE;
 	}
 	DWORD noBytesWritten;
 	WriteFile(file, buffer, size, &noBytesWritten, NULL);
 	CloseHandle(file);
 	if (noBytesWritten != size)
-		return false;
-	return true;
+		return FALSE;
+	return TRUE;
 }
 
-/* HANDLE RGLCreateThread(LPVOID startAddr, LPVOID parameters) {
-	HANDLE hThread; DWORD hThreadID;
-	ExCreateThread(&hThread, 0, &hThreadID, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)startAddr, parameters, THREAD_PRIORITY_HIGHEST);
-	XSetThreadProcessor(hThread, 4);
-	ResumeThread(hThread);
-	CloseHandle(hThread);
+PWCHAR CharToWChar(const PCHAR text, PWCHAR stackPtr) {
+	const size_t size = strlen(text) + 1;
+	mbstowcs(stackPtr, text, size);
+	return stackPtr;
+}
 
-	return hThread;
-} */
+PCHAR WCharToChar(const PWCHAR text, PCHAR stackPtr) {
+	const size_t size = lstrlenW(text) + 1;
+	wcstombs(stackPtr, text, size);
+	return stackPtr;
+}
+
+string StrToLower(const string& str) {
+	string result;
+	for(size_t i = 0; i < str.length(); ++i) {
+		char c = str[i];
+		if(c >= 'A' && c <= 'Z') {
+			result += c + ('a' - 'A');
+		} else {
+			result += c;
+		}
+	}
+	return result;
+}
+
+vector<string> StrSplit(string s, string delimiter) {
+	size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+	string token;
+	vector<string> res;
+
+	while ((pos_end = s.find(delimiter, pos_start)) != string::npos) {
+		token = s.substr(pos_start, pos_end - pos_start);
+		pos_start = pos_end + delim_len;
+		res.push_back(token);
+	}
+
+	res.push_back(s.substr(pos_start));
+	return res;
+}

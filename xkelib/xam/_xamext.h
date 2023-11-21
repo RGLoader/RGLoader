@@ -7,6 +7,7 @@
 #include "xamXContent.h"
 #include "xamTask.h"
 #include "xamNet.h"
+#include "xamExpEnum.h"
 
 typedef PVOID                           HXAMAPP, *PHXAMAPP;
 
@@ -115,18 +116,63 @@ typedef enum _DVD_MEDIA_TYPES {
 } DVD_MEDIA_TYPES;
 
 typedef enum _DVD_TRAY_STATE {
-	DVD_TRAY_STATE_EMPTY,
-	DVD_TRAY_STATE_CLOSING,
-	DVD_TRAY_STATE_OPEN,
-	DVD_TRAY_STATE_OPENING,
-	DVD_TRAY_STATE_CLOSED,
-	DVD_TRAY_STATE_ERROR
+	DVD_TRAY_STATE_EMPTY = 0,
+	DVD_TRAY_STATE_CLOSING = 1,
+	DVD_TRAY_STATE_OPEN = 2,
+	DVD_TRAY_STATE_OPENING = 3,
+	DVD_TRAY_STATE_CLOSED = 4,
+	DVD_TRAY_STATE_ERROR = 5
 } DVD_TRAY_STATE;
 
 typedef enum _STAGING_MODE {
 	STAGING_MODE_PRODUCTION = 0x0,
 	STAGING_MODE_STAGING = 0x1,
 } STAGING_MODE;
+
+// for use with XamDbgSetOutputLevel and XamDbgSetBreakLevel
+typedef enum _XDEBUG_LEVEL {
+	XDEBUG_ERROR = 1, // ERR
+	XDEBUG_WARN, // WRN
+	XDEBUG_TRACE, // TRC
+	XDEBUG_ENT, // ENT
+	XDEBUG_EXT, // EXT
+} XDEBUG_LEVEL;
+
+typedef enum _XAM_CACHE_FILE_TYPE {
+	XAM_CACHE_ALL = 0x0,
+	XAM_CACHE_GAME_TILE = 0x1,				// 'TT'
+	XAM_CACHE_ACHIEVEMENT_TILE = 0x2,		// 'AT'
+	XAM_CACHE_GAMER_TILE = 0x3,				// 'GT'
+	XAM_CACHE_GAMER_TILE_SMALL = 0x4,		// ''
+	XAM_CACHE_CUSTOM_GAMER_TILE = 0x5,		// 'CT'
+	XAM_CACHE_CUSTOM_GAMER_TILE_SMALL = 0x6,// ''
+	XAM_CACHE_FRIEND_MUTE_LIST = 0x7,		// 'FM'
+	XAM_CACHE_TICKETS = 0x8,				// 'TK'
+	XAM_CACHE_TITLE_NAMES = 0x9,			// 'TN'
+	XAM_CACHE_RECENT_PLAYERS = 0xA,			// ''
+	XAM_CACHE_TITLE_UPDATE = 0xB,			// 'TU'
+	XAM_CACHE_SYSTEM_UPDATE = 0xC,			// 'SU'
+	XAM_CACHE_DASHBOARD_APP = 0xD,			// 'DA'
+	XAM_CACHE_SPA_FILE = 0xE,				// 'SP'
+	XAM_CACHE_GAME_INVITE = 0xF,			// 'GI'
+	XAM_CACHE_GAMER_TAG = 0x10,				// 'GA'
+	XAM_CACHE_MESSENGER_BUDDIES = 0x11,		// 'MB'
+	XAM_CACHE_QOS_HISTORY = 0x12,			// 'QH'
+	XAM_CACHE_PROFILE_SETTINGS = 0x13,		// 'PS'
+	XAM_CACHE_AVATAR_GAMER_TILE = 0x14,		// 'AV'
+	XAM_CACHE_CERT_STORAGE = 0x15,			// 'CA'
+	XAM_CACHE_VALIDATE_CERT = 0x16,			// 'VC'
+	XAM_CACHE_NUI_SESSION = 0x17,			// 'NS'
+	XAM_CACHE_NUI_BIOMETRIC = 0x18,			// 'NB'
+	XAM_CACHE_NUI_TROUBLESHOOTER = 0x19,	// 'TS'
+	XAM_CACHE_NUI_HIVE_SETTING = 0x1A,		// 'NH'
+	XAM_CACHE_XLFS_UPLOADER = 0x1B,			// 'XL'
+	XAM_CACHE_DASH_CACHESEEDFILE = 0x1C,	// 'DC'
+	XAM_CACHE_ZEST_AUTHENTICATION = 0x1D,	// 'ZA'
+	XAM_CACHE_XSTS_TOKEN = 0x1E,			// 'XT'
+	XAM_CACHE_LIVEID_DEVICE = 0x1F,			// 'LD'
+	XAM_CACHE_CURRENCY_FORMATTING = 0x20,	// 'CF'
+} XAM_CACHE_FILE_TYPE;
 
 typedef VOID (CALLBACK *PFNMSGBOXRETURN)(
 	IN      INT                         iButtonPressed,
@@ -189,6 +235,31 @@ typedef struct _XINPUT_DEVICE_STATS {
 } XINPUT_DEVICE_STATS, *PXINPUT_DEVICE_STATS; // size 28
 C_ASSERT(sizeof(XINPUT_DEVICE_STATS) == 0x1C);
 
+typedef struct _XINPUT_CAPABILITIES_EX { 
+	BYTE Type; // 0x0 sz:0x1
+	BYTE SubType; // 0x1 sz:0x1
+	WORD Flags; // 0x2 sz:0x2
+	XINPUT_GAMEPAD Gamepad; // 0x4 sz:0xC
+	XINPUT_VIBRATION Vibration; // 0x10 sz:0x4
+	WORD Vid; // 0x14 sz:0x2
+	WORD Pid; // 0x16 sz:0x2
+	WORD Revision; // 0x18 sz:0x2
+	BYTE OriginalSubType; // 0x1A sz:0x1
+	BYTE ExtraFlags; // 0x1B sz:0x1
+	DWORD Xid; // 0x1C sz:0x4
+} XINPUT_CAPABILITIES_EX, *PXINPUT_CAPABILITIES_EX; // size 32
+C_ASSERT(sizeof(XINPUT_CAPABILITIES_EX) == 0x20);
+
+// see xinputdefs.h in sdk for others
+// #define XINPUT_FLAG_ANYUSER		0x40000000
+#define XINPUT_FLAG_SYSTEMAPP	0x80000000
+
+// XamUserGetDeviceContext categories
+#define DRV_CATEGORY_INPUT		0x0
+#define DRV_CATEGORY_OUTPUT		0x1
+
+// launchData[7] = 0x0C; strcpy( &launchData[12], "library:music" ); // play cd audio
+// launchData[7] = 0x0C; strcpy( &launchData[12], "library:music:LaunchCD" ); // open up direclty to the cdplayer
 typedef enum {
 	XDASHLAUNCHDATA_COMMAND_DEFAULT = 0, // 14719
 	XDASHLAUNCHDATA_COMMAND_SIGNUP = 1,
@@ -346,6 +417,47 @@ extern "C" {
 #endif
 	
 	NTSYSAPI
+	EXPORTNUM(309)
+	HRESULT
+	NTAPI
+	XNetLogonGetMachineID(
+		IN OUT	QWORD* pqwMachineID
+	);
+
+	NTSYSAPI
+	EXPORTNUM(400)
+	HRESULT // returns 0 on success
+	NTAPI
+	XamInputGetCapabilities(
+		IN		DWORD dwUserIndex,
+		IN		DWORD dwFlags, // see XINPUT_FLAG
+		IN OUT	PXINPUT_CAPABILITIES capStruct
+	);
+
+	NTSYSAPI
+	EXPORTNUM(401)
+	HRESULT
+	NTAPI
+	XamInputGetState(
+		IN		DWORD dwUserIndex,
+		IN		DWORD dwDeviceContext, // || flags, games call with this set to 1 to get controller response which seems to be device type 1
+		IN OUT	XINPUT_STATE* pInputState
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(402)
+	HRESULT // returns 0 on success
+	NTAPI
+	XamInputSetState(
+		IN		DWORD dwUserIndex,
+		IN		DWORD dwFlags,
+		IN		XINPUT_STATE* pInputState, // prob not the right struct!!
+		IN 		BYTE bAmplitude,
+		IN 		BYTE bFrequency,
+		IN 		BYTE bOffset
+	);
+
+	NTSYSAPI
 	EXPORTNUM(407)
 	DWORD
 	NTAPI
@@ -356,7 +468,7 @@ extern "C" {
 
 	NTSYSAPI
 	EXPORTNUM(419)
-	NTSTATUS
+	DWORD // returns TitleId
 	NTAPI
 	XamLoaderGetMediaInfo(
 		IN OUT	PDWORD pdwMediaType,
@@ -369,7 +481,7 @@ extern "C" {
 	NTAPI
 	XamLoaderLaunchTitle(
 		IN		LPCSTR szLaunchPath,
-		IN		DWORD DwFlags
+		IN		DWORD dwFlags
 		);
 
 	NTSYSAPI
@@ -380,7 +492,7 @@ extern "C" {
 		IN		LPCSTR szLaunchPath,
 		IN		LPCSTR szMountPath,
 		IN		LPCSTR szCmdLine,
-		IN		DWORD DwFlags
+		IN		DWORD dwFlags
 		);
 
 	NTSYSAPI
@@ -426,7 +538,8 @@ extern "C" {
 	VOID
 	NTAPI
 	XamLoaderSetSpindleSpeed(
-		IN		int Speed
+		IN		int Speed,
+		IN		BOOL isDefferable // if FALSE spindle speed is set immediately
 	);
 
 	NTSYSAPI
@@ -526,10 +639,18 @@ extern "C" {
 	);
 
 	NTSYSAPI
-	EXPORTNUM(444)
+	EXPORTNUM(443)
 	BOOL
 	NTAPI
 	XamIsSystemTitleId(
+		VOID
+	);
+
+	NTSYSAPI
+	EXPORTNUM(444)
+	BOOL
+	NTAPI
+	XamLoaderIsTitleTerminatePending(
 		VOID
 	);
 
@@ -562,8 +683,8 @@ extern "C" {
 	NTSTATUS
 	NTAPI
 	XamGetDefaultSystemImage( // gets "defaultsystemimage.png"
-		OUT		PVOID* imageSource,
-		OUT		PDWORD imageLen
+		OUT		PVOID* pImageSource,
+		OUT		PDWORD pdwImageLen
 	);
 
 	NTSYSAPI
@@ -572,8 +693,8 @@ extern "C" {
 	NTAPI
 	XamGetDefaultImage(
 		IN		XAM_DEFAULT_IMAGE_ID index,
-		OUT		PVOID* imageSource,
-		OUT		PDWORD imageLen
+		OUT		PVOID* pImageSource,
+		OUT		PDWORD pdwImageLen
 	);
 
 	NTSYSAPI
@@ -621,7 +742,7 @@ extern "C" {
 	VOID
 	NTAPI
 	XamLoaderSetCurrentTitleIsDash(
-		IN		DWORD titleIdToSet
+		IN		DWORD dwTitleId
 	);
 	
 	NTSYSAPI
@@ -683,7 +804,7 @@ extern "C" {
 	NTAPI
 	XamDbgSetOutputLevel(
 		IN		DWORD dwAppId, // 0xFE is the only one that sets XDebugOutLevel
-		IN		BYTE level	// 0-0xF
+		IN		XDEBUG_LEVEL level	// 0-0xF
 	);
 	
 	NTSYSAPI
@@ -692,7 +813,46 @@ extern "C" {
 	NTAPI
 	XamDbgSetBreakLevel(
 		IN		DWORD dwAppId, // 0xFE is the only one that sets XDebugOutLevel
-		IN		BYTE level	// 0-0xF
+		IN		XDEBUG_LEVEL level	// 0-0xF
+	);
+
+	NTSYSAPI
+	EXPORTNUM(483)
+	NTSTATUS
+	NTAPI
+	XamLoaderGetMediaInfoEx(
+		IN OUT	PDWORD pdwMediaType,
+		IN OUT	PDWORD pdwTitleId,
+		IN OUT	PDWORD pdwTypeExt // not entirely clear what this is, needs testing
+	);
+
+	NTSYSAPI
+	EXPORTNUM(490)
+	HRESULT
+	NTAPI
+	XamAlloc(
+		IN      DWORD dwFlags,
+		IN      DWORD cb,
+		OUT     PVOID* ppv
+	);
+
+	NTSYSAPI
+	EXPORTNUM(491)
+	HRESULT
+	NTAPI
+	XamAllocEx( // only use for physical allocations
+		IN      DWORD dwFlagsEx,
+		IN      DWORD dwFlags,
+		IN      DWORD cb,
+		OUT     PVOID* ppv
+	);
+
+	NTSYSAPI
+	EXPORTNUM(492)
+	VOID
+	NTAPI
+	XamFree(
+		IN     PVOID pv
 	);
 
 	// already in xam.h
@@ -759,7 +919,7 @@ extern "C" {
 	BOOL
 	NTAPI
 	XamFeatureEnabled(
-		IN		DWORD feature
+		IN		DWORD dwFeature
 	);
 	
 	NTSYSAPI
@@ -768,8 +928,8 @@ extern "C" {
 	NTAPI
 	XamUserGetDeviceContext(
 		IN		DWORD dwUserIndex,
-		IN		DWORD category,
-		IN OUT	PDWORD* DeviceContext
+		IN		DWORD dwCategory,
+		IN OUT	PDWORD DeviceContext
 	);
 
 	NTSYSAPI
@@ -777,7 +937,7 @@ extern "C" {
 	NTSTATUS
 	NTAPI
 	XamUserLookupDevice( 
-		IN	PDWORD pdwDeviceContext,
+		IN	DWORD dwDeviceContext,
 		IN  DWORD dwCategory,
 		OUT PDWORD pdwUserIndex
 	);
@@ -811,14 +971,14 @@ extern "C" {
 		// IN		DWORD dwUserIndex,
 		// IN		LPSTR pUserName,
 		// IN		DWORD cchUserName
-    // );
+	// );
 
 	NTSYSAPI
 	EXPORTNUM(527)
 	LPCWSTR
 	NTAPI
 	XamLookupCommonStringByIndex(
-		IN		DWORD index
+		IN		DWORD dwIndex
 	);
 
 	// already in sdk xam.h
@@ -828,7 +988,7 @@ extern "C" {
 	// NTAPI
 	// XamUserGetSigninState(
 		// IN		DWORD dwUserIndex
-    // );
+	// );
 
 	NTSYSAPI
 	EXPORTNUM(530)
@@ -836,7 +996,7 @@ extern "C" {
 	NTAPI
 	XamUserCheckPrivilege(
 		IN		DWORD dwUserIndex,
-		IN		DWORD PrivilegeType,
+		IN		DWORD dwPrivilegeType,
 		OUT		PBOOL pfResult
 	);
 
@@ -845,16 +1005,16 @@ extern "C" {
 	DWORD
 	NTAPI
 	XamUserReadProfileSettings(
-        DWORD dwTitleId,
-        DWORD dwUserIndexRequester,
-        DWORD dwNumFor,
-        const PXUID pxuidFor,
-        DWORD dwNumSettingIds,
-        const PDWORD pdwSettingIds,
-        PDWORD pcbResults,
-        PXUSER_READ_PROFILE_SETTING_RESULT pResults, // in xonline.h
-        PXOVERLAPPED pXOverlapped OPTIONAL
-    );
+		DWORD dwTitleId,
+		DWORD dwUserIndexRequester,
+		DWORD dwNumFor,
+		const PXUID pxuidFor,
+		DWORD dwNumSettingIds,
+		const PDWORD pdwSettingIds,
+		PDWORD pcbResults,
+		PXUSER_READ_PROFILE_SETTING_RESULT pResults, // in xonline.h
+		PXOVERLAPPED pXOverlapped OPTIONAL
+	);
 
 	NTSYSAPI
 	EXPORTNUM(542)
@@ -878,7 +1038,7 @@ extern "C" {
 	NTAPI
 	XamUserGetSigninInfo(
 		IN		DWORD userIndex,
-		IN		DWORD flags,
+		IN		DWORD dwFlags,
 		IN OUT	PXUSER_SIGNIN_INFO xSigningInfo
 	);
 
@@ -890,7 +1050,7 @@ extern "C" {
 	// XamUserGetUsersMissingAvatars(
 		// OUT		DWORD* pdwUserIndexMask,
 		// IN OUT	PXOVERLAPPED pOverlapped OPTIONAL
-    // );
+	// );
 
 	NTSYSAPI
 	EXPORTNUM(561)
@@ -968,7 +1128,7 @@ extern "C" {
 		// IN		DWORD cItemsRequested,
 		// IN		DWORD dwEnumFlags,
 		// OUT		PHANDLE phEnum
-    // );
+	// );
 
 	// already in sdk xam.h
 	// NTSYSAPI
@@ -978,7 +1138,7 @@ extern "C" {
 	// XamGetPrivateEnumStructureFromHandle(
 		// IN		HANDLE hEnum,
 		// OUT		PVOID* ppvObj
-    // );
+	// );
 
 	// NOT TESTED, same as XEnumerate with dwFlags added
 	NTSYSAPI
@@ -1114,7 +1274,7 @@ extern "C" {
 	NTSTATUS
 	NTAPI
 	XamGetExecutionId(
-		IN OUT	PXEX_EXECUTION_ID xid
+		IN OUT	PXEX_EXECUTION_ID* xid
 	);
 	
 	NTSYSAPI
@@ -1215,7 +1375,7 @@ extern "C" {
 		IN		BOOL pfShowMovie,
 		IN		BOOL pfPlaySound,
 		IN		BOOL pfShowIPTV
-    );
+	);
 
 	NTSYSAPI
 	EXPORTNUM(659)
@@ -1226,7 +1386,7 @@ extern "C" {
 		IN OUT	BOOL* pfShowMovie OPTIONAL,
 		IN OUT	BOOL* pfPlaySound OPTIONAL,
 		IN OUT	BOOL* pfShowIPTV OPTIONAL
-    );
+	);
 
 	NTSYSAPI
 	EXPORTNUM(679)
@@ -1234,6 +1394,25 @@ extern "C" {
 	NTAPI
 	XamUpdateGetCurrentSystemVersion(
 		VOID
+	);
+
+	NTSYSAPI
+	EXPORTNUM(685)
+	HRESULT // returns 0 on success
+	NTAPI
+	XamInputGetCapabilitiesEx(
+		IN		DWORD unk1, // can be 0 or 1, anything else returns ERROR_NOT_SUPPORTED - likely DRV_CATEGORY
+		IN		DWORD dwUserIndex,
+		IN		DWORD dwFlags,	// see XINPUT_FLAG
+		IN OUT	PXINPUT_CAPABILITIES_EX capStruct
+	);
+
+	NTSYSAPI
+	EXPORTNUM(695)
+	BOOL
+	NTAPI
+	XamCacheReset(
+		IN		XAM_CACHE_FILE_TYPE FileType
 	);
 
 	NTSYSAPI
@@ -1267,7 +1446,7 @@ extern "C" {
 	HRESULT
 	NTAPI
 	XamShowMessageBox(
-		IN		DWORD unk,
+		IN		HANDLE hOuter, // HXUIOBJ hOuter
 		IN		LPCWSTR wszTitle,
 		IN		LPCWSTR wszText,
 		IN		DWORD cButtons,
@@ -1339,6 +1518,18 @@ extern "C" {
 		IN		DWORD dwPitch,
 		IN		DWORD dwHeight,
 		IN OUT	PXOVERLAPPED pXOverlapped OPTIONAL
+	);
+
+	NTSYSAPI
+	EXPORTNUM(795)
+	DWORD
+	NTAPI
+	XamBuildResourceLocator(
+		IN		HANDLE hHandle,
+		IN		PWCHAR procName,
+		IN		LPCWSTR pszResource,
+		IN		LPWSTR pszResourceLocator,
+		IN  	DWORD cchResourceLocator
 	);
 
 	NTSYSAPI
@@ -1725,10 +1916,23 @@ extern "C" {
 	);
 	*/
 
+	
 #ifdef __cplusplus
 }
 #endif
 
-
+/*
+enum XHUDOPENSTATE {
+    XHUDOPENSTATE_NONE = 0x0,
+    XHUDOPENSTATE_HALF = 0x1,
+    XHUDOPENSTATE_FULL = 0x2,
+    XHUDOPENSTATE_ERROR = 0x3,
+    XHUDOPENSTATE_COUNT = 0x4,
+};
+ 
+XamOverrideHudOpenType Exported entry 961.
+ 
+HTSTATUS XamOverrideHudOpenType( XHUDOPENSTATE newState);
+*/
 
 #endif // __XAMEXT_DEFINES_H

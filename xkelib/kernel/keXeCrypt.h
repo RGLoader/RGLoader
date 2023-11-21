@@ -1,6 +1,14 @@
 #ifndef __KEXECRYPT_H
 #define __KEXECRYPT_H
 
+typedef enum _XE_RSA_KEY_TYPE { // for XeKeysVerifyRSASignature
+	XE_PIRS_RSA_KEY = 0x0,
+	XE_LIVEDRM_RSA_KEY = 0x1,
+	XE_DEVICE_RSA_KEY = 0x2,
+	XE_XSIGNER2_RSA_KEY = 0x3,
+	XE_MAX_RSA_KEY = 0x4,
+} XE_RSA_KEY_TYPE;
+
 #define XECRYPT_DES_BLOCK_SIZE      (0x8)
 #define XECRYPT_DES_KEY_SIZE        (0x8)
 #define XECRYPT_DES3_KEY_SIZE       (0x18)
@@ -15,6 +23,24 @@
 
 
 /* ******************* console certificate stuff ******************* */
+#pragma pack(push, 1)
+typedef struct _XE_CONSOLE_ID {
+	union{
+		struct {
+			BYTE refurbBits : 4;
+			BYTE ManufactureMonth : 4;
+			DWORD ManufactureYear : 4;
+			DWORD MacIndex3 : 8;
+			DWORD MacIndex4 : 8;
+			DWORD MacIndex5 : 8;
+			DWORD Crc : 4;
+		} asBits;
+		BYTE abData[5];
+	};
+} XE_CONSOLE_ID, *PXE_CONSOLE_ID; // size 5
+C_ASSERT(sizeof(XE_CONSOLE_ID) == 0x5);
+#pragma pack(pop)
+
 typedef struct _CONSOLE_PUBLIC_KEY { 
 	BYTE PublicExponent[0x4]; // 0x0 sz:0x4
 	BYTE Modulus[0x80]; // 0x4 sz:0x80
@@ -23,7 +49,7 @@ C_ASSERT(sizeof(CONSOLE_PUBLIC_KEY) == 0x84);
 
 typedef struct _XE_CONSOLE_CERTIFICATE { 
 	WORD CertSize; // 0x0 sz:0x2
-	BYTE ConsoleId[0x5]; // 0x2 sz:0x5
+	XE_CONSOLE_ID ConsoleId; // 0x2 sz:0x5
 	BYTE ConsolePartNumber[0xB]; // 0x7 sz:0xB
 	BYTE Reserved[0x4]; // 0x12 sz:0x4
 	WORD Privileges; // 0x16 sz:0x2
@@ -216,6 +242,161 @@ typedef struct _XECRYPT_ECPUB_512 {
 	QWORD aqwGP[0x10]; // 0x148 sz:0x80
 } XECRYPT_ECPUB_512, *PXECRYPT_ECPUB_512; // size 456
 C_ASSERT(sizeof(XECRYPT_ECPUB_512) == 0x1C8);
+
+/* ******************* CRL.bin ******************* */
+typedef struct _CERTIFICATE_REVOCATION_DATA { 
+	DWORD Size; // 0x0 sz:0x4
+	DWORD Version; // 0x4 sz:0x4
+	DWORD Count; // 0x8 sz:0x4
+} CERTIFICATE_REVOCATION_DATA, *PCERTIFICATE_REVOCATION_DATA; // size 12
+C_ASSERT(sizeof(CERTIFICATE_REVOCATION_DATA) == 0xC);
+
+typedef struct _CERTIFICATE_REVOCATION_BOX_DATA { 
+	LARGE_INTEGER DateStamp; // 0x0 sz:0x8
+	BYTE Padding[0x7]; // 0x8 sz:0x7
+	BYTE UpdateSequence; // 0xF sz:0x1
+} CERTIFICATE_REVOCATION_BOX_DATA, *PCERTIFICATE_REVOCATION_BOX_DATA; // size 16
+C_ASSERT(sizeof(CERTIFICATE_REVOCATION_BOX_DATA) == 0x10);
+
+typedef struct _CERTIFICATE_REVOCATION_LIST_HEADER { // typically header is immediately followed by the data, starting with CERTIFICATE_REVOCATION_DATA
+	DWORD Signer; // 0x0 sz:0x4
+	BYTE ConsoleID[0x5]; // 0x4 sz:0x5
+	BYTE Padding[0x3]; // 0x9 sz:0x3
+	BYTE Digest[0x14]; // 0xC sz:0x14
+	XECRYPT_SIG Signature; // 0x20 sz:0x100
+	BYTE Nonce[0x10]; // 0x120 sz:0x10
+	BYTE Key[0x10]; // 0x130 sz:0x10
+	union {
+		CERTIFICATE_REVOCATION_BOX_DATA BoxData; // 0x140 sz:0x10
+		BYTE BoxDataAsBYTE[0x10]; // 0x140 sz:0x10
+	};
+} CERTIFICATE_REVOCATION_LIST_HEADER, *PCERTIFICATE_REVOCATION_LIST_HEADER; // size 336
+C_ASSERT(sizeof(CERTIFICATE_REVOCATION_LIST_HEADER) == 0x150);
+
+typedef union _DYNAMIC_REVOCATION_LIST { 
+	CERTIFICATE_REVOCATION_LIST_HEADER RevocationList; // 0x0 sz:0x150
+	BYTE Reserved[0x8000]; // 0x0 sz:0x8000
+} DYNAMIC_REVOCATION_LIST, *PDYNAMIC_REVOCATION_LIST; // size 32768
+C_ASSERT(sizeof(DYNAMIC_REVOCATION_LIST) == 0x8000);
+
+
+/* ******************* HDD security sector ******************* */
+// stored at sector 2?
+typedef struct _HDD_SECURITY_BLOB { 
+	BYTE SerialNumber[0x14]; // 0x0 sz:0x14
+	BYTE FirmwareRevision[0x8]; // 0x14 sz:0x8
+	BYTE ModelNumber[0x28]; // 0x1C sz:0x28
+	BYTE LogoBitmapDigest[0x14]; // 0x44 sz:0x14
+	DWORD UserAddressableSectors; // 0x58 sz:0x4
+	BYTE Signature[0x100]; // 0x5C sz:0x100
+} HDD_SECURITY_BLOB, *PHDD_SECURITY_BLOB; // size 348
+C_ASSERT(sizeof(HDD_SECURITY_BLOB) == 0x15C);
+
+/* ******************* DAE.BIN decrypted ******************* */
+typedef struct _DVD_AUTH_EX_DATA_D { 
+	WORD Flags; // 0x0 sz:0x2
+	WORD Reserved02; // 0x2 sz:0x2
+	WORD Reserved04; // 0x4 sz:0x2
+	WORD Reserved06; // 0x6 sz:0x2
+	WORD Reserved08; // 0x8 sz:0x2
+	WORD Reserved0A; // 0xA sz:0x2
+	WORD Reserved0C; // 0xC sz:0x2
+	WORD Reserved0E; // 0xE sz:0x2
+} DVD_AUTH_EX_DATA_D, *PDVD_AUTH_EX_DATA_D; // size 16
+C_ASSERT(sizeof(DVD_AUTH_EX_DATA_D) == 0x10);
+
+typedef struct _DVD_AUTH_EX_DATA_E { 
+	LARGE_INTEGER DateStamp; // 0x0 sz:0x8
+	WORD Reserved08; // 0x8 sz:0x2
+	WORD Reserved0A; // 0xA sz:0x2
+	WORD Reserved0C; // 0xC sz:0x2
+	BYTE Reserved0E; // 0xE sz:0x1
+	BYTE UpdateSequence; // 0xF sz:0x1
+} DVD_AUTH_EX_DATA_E, *PDVD_AUTH_EX_DATA_E; // size 16
+C_ASSERT(sizeof(DVD_AUTH_EX_DATA_E) == 0x10);
+
+typedef struct _DVD_AUTH_EX_HEADER { 
+	DWORD Signer; // 0x0 sz:0x4
+	WORD Size; // 0x4 sz:0x2
+	WORD Flags; // 0x6 sz:0x2
+	WORD Version; // 0x8 sz:0x2
+	WORD Reserved0A; // 0xA sz:0x2
+	BYTE DigestTable[0x14]; // 0xC sz:0x14
+	BYTE Signature[0x100]; // 0x20 sz:0x100
+	DVD_AUTH_EX_DATA_D DataD; // 0x120 sz:0x10
+	DVD_AUTH_EX_DATA_E DataE; // 0x130 sz:0x10
+	BYTE DigestUnique[0x10]; // 0x140 sz:0x10
+} DVD_AUTH_EX_HEADER, *PDVD_AUTH_EX_HEADER; // size 336
+C_ASSERT(sizeof(DVD_AUTH_EX_HEADER) == 0x150);
+
+/* ******************* SECDATA.BIN decrypted ******************* */
+typedef enum _SOFTWARE_SECURITY_STAT_INDEX {
+	SOFTWARE_SECURITY_STAT_RESERVED_FOR_COMPATIBILITY = 0x0, // 0x38 in secdata.bin, all DWORD
+	SOFTWARE_SECURITY_STAT_DVD_BOOT_FAILURES = 0x1,
+	SOFTWARE_SECURITY_STAT_FUSE_BLOW_FAILURES = 0x2,
+	SOFTWARE_SECURITY_STAT_DVD_AUTH_EX_FAILURES = 0x3,
+	SOFTWARE_SECURITY_STAT_DVD_AUTH_EX_TIMEOUTS = 0x4,
+	SOFTWARE_SECURITY_STAT_MAXIMUM = 0x5,
+};
+
+typedef struct _SECDATA_BLOB{
+	BYTE abHash[0x10]; // 0 sz 0x10
+	BYTE abConfounder[0x8];// 0x10
+	BYTE SecurityActivated; // 0x18
+	BYTE SecurityLockDownValue; // 0x19
+	BYTE pad1[2]; // 0x1A sz 0x2
+	WORD wUnkn1; // 0x1C
+	WORD wUnkn2; // 0x1E
+	FILETIME ftTime; // 0x20
+	QWORD cSecurityDetectedError; // 0x28
+	QWORD cSecurityActivatedError; // 0x30
+	DWORD dwCompatReserved; // 0x38
+	DWORD dwDvdBootFailures; // 0x3C
+	DWORD dwFuseBlowFailures; // 0x40
+	DWORD dwDvdAuthExFailures; // 0x44
+	DWORD dwDvdAuthExTimeouts; // 0x48
+	BYTE pad2[0x3B4]; // 0x5c
+
+	//QWORD cDvdDetectionError; // 0x38 << old defines
+	//QWORD cLockSystemUpdate; // 0x40
+	//BYTE pad2[0x3B8]; // 0x48
+} SECDATA_BLOB, *PSECDATA_BLOB;
+C_ASSERT(sizeof(SECDATA_BLOB) == 0x400);
+
+/* ******************* FCRT.BIN decrypted ******************* */
+typedef struct _FCRT_HEADER{
+	BYTE abSignature[0x100]; // 0 signature is calculcated with a has of header from abAesFeed to end of abPayloadHash, after abPayloadHash is calculated
+	BYTE abAesFeed[0x10]; // 0x100 random value, with first byte being |0x1
+	DWORD dwFlags; // 0x110
+	DWORD dwVersion; // 0x114
+	DWORD dwDataSize; // 0x118
+	DWORD dwHeaderSize; // 0x11C
+	BYTE abPad[0xC]; // 0x120
+	BYTE abPayloadHash[0x14]; // 0x12C sha1 of data following this for dwDataSize
+} FCRT_HEADER, *PFCRT_HEADER;
+ C_ASSERT(sizeof(FCRT_HEADER) == 0x140);
+
+ /* ******************* EXTENDED.BIN decrypted ******************* */
+ typedef struct _EXTENDED_BIN_DATA{
+	 BYTE abNonce[0x10]; 				// 0
+	 BYTE abConfounder[0x8]; 			// 0x0010
+	 BYTE abVidDevPubKey[0x28]; 			// 0x0018 XEKEYEX_VIDEO_DEVICE_PUBLIC_KEY: .set 0x100
+	 BYTE abVidDevPrvKey[0x14]; 			// 0x0040 XEKEYEX_VIDEO_DEVICE_PRIVATE_KEY: .set 0x101
+	 BYTE abVidDevCert[0x9C4]; 			// 0x0054 XEKEYEX_VIDEO_DEVICE_CERTIFICATE: .set 0x102
+	 BYTE abIptvAvPrvKey[0x390]; 		// 0x0A18 XEKEYEX_IPTV_AV_PRIVATE_KEY: .set 0x103
+	 BYTE abIptvAuthPrvKey[0x390]; 		// 0x0DA8 XEKEYEX_IPTV_AUTH_PRIVATE_KEY: .set 0x104
+	 BYTE abIptvAvCert[0x5DC]; 			// 0x1138 XEKEYEX_IPTV_AV_CERTIFICATE: .set 0x105
+	 BYTE abIptvAuthCert[0x5DC]; 		// 0x1714 XEKEYEX_IPTV_AUTH_CERTIFICATE: .set 0x106
+	 BYTE abIptvAvSerializedCert[0x5DC]; // 0x1CF0 XEKEYEX_IPTV_AV_SERIALIZED_CERTIFICATE: .set 0x107
+	 BYTE abIptvAuthSerializedCert[0x5DC];// 0x22CC XEKEYEX_IPTV_AUTH_SERIALIZED_CERTIFICATE: .set 0x108
+	 BYTE abVidDevPrPubKeySign[0x40]; 	// 0x28A8 XEKEYEX_VIDEO_DEVICE_PR_PUBLIC_KEY_SIGN: .set 0x109
+	 BYTE abVidDevPrPrvKeySign[0x20]; 	// 0x28C8 XEKEYEX_VIDEO_DEVICE_PR_PRIVATE_KEY_SIGN: .set 0x10A
+	 BYTE abVidDevPrPubKeyEnc[0x40]; 	// 0x2908 XEKEYEX_VIDEO_DEVICE_PR_PUBLIC_KEY_ENCRYPT: .set 0x10B
+	 BYTE abVidDevPrPrvKeyEnc[0x20]; 	// 0x2948 XEKEYEX_VIDEO_DEVICE_PR_PRIVATE_KEY_ENCRYPT: .set 0x10C
+	 BYTE abVidDevPrCert[0x1388];		// 0x2968 XEKEYEX_VIDEO_DEVICE_PR_CERTIFICATE: .set 0x10D
+	 BYTE pad[0x310];					// 0x3CF0
+ }EXTENDED_BIN_DATA, *PEXTENDED_BIN_DATA;
+ C_ASSERT(sizeof(EXTENDED_BIN_DATA) == 0x4000);
 
 /* ******************* Functions ******************* */
 
@@ -857,6 +1038,17 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(600)
+	BOOL
+	NTAPI
+	XeKeysVerifyRSASignature(
+		IN		XE_RSA_KEY_TYPE key,
+		IN		const BYTE *pbHash,
+		IN		const BYTE *pbSig,
+		IN		const BYTE *pubKey
+	);
+
+	NTSYSAPI
 	EXPORTNUM(806)
 	int
 	NTAPI
@@ -865,8 +1057,6 @@ extern "C" {
 		IN		const PQWORD pqwB,
 		IN		DWORD cqw
 	);
-
-	
 	/* ** not included
 	XeCryptSha256Init @784
 	XeCryptSha256Update @785
@@ -883,6 +1073,21 @@ extern "C" {
 	XeCryptAesCtr @863
 	XeCryptAesCbcMac @864
 	XeCryptAesDmMac @865
+	
+	XeCryptSha224Init @918
+	XeCryptAesCreateKeySchedule @919
+	XeCryptAesEncryptOne @920
+	XeCryptAesDecryptOne @921
+	XeCryptAesCbcEncrypt @922
+	XeCryptAesCbcDecrypt @923
+	XeCryptAesGcmInitialize @924
+	XeCryptAesGcmUpdate @925
+	XeCryptAesGcmFinalize @926
+	XeCryptEccGetCurveParameters @927
+	XeCryptEccEcdhGenerateKeypair @928
+	XeCryptEccEcdhExponentiate @929
+	XeCryptEccEcdsaGenerateSignature @930
+	XeCryptEccEcdsaVerifySignature @931
 	** */
 
 #ifdef __cplusplus

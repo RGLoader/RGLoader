@@ -5,6 +5,9 @@
 
 #define XEKEY_CONSOLETYPE_DEVKIT	0x00000001
 #define XEKEY_CONSOLETYPE_RETAIL	0x00000002
+#define XEIKA_DATA_SIGNATURE		0x4F534947 // 'OSIG'
+#define XEIKA_DATA_ODD_VERSION		0x1
+#define XEIKA_DATA_VERSION			0x1
 
 typedef enum _XEKEY_OBFUSCATE {
 	XEKEY_OBFUSCATE_CONSOLE = 0, // uses XEKEY_CONSOLE_OBFUSCATION_KEY = 0x17
@@ -89,7 +92,11 @@ typedef enum _XEKEY_INDEX {
 	XEKEY_SPECIAL_DVD_FIRMWARE_KEY = 0x47,
 	XEKEY_SPECIAL_DEBUG_UNLOCK = 0x48,
 	XEKEY_SPECIAL_DEBUG_UNLOCK_STATE = 0x49,
-	XEKEY_MAX_CONSTANT_INDEX = 0x4A,
+	XEKEY_SPECIAL_IMAGE_OBFUSCATION_KEY = 0x4A,
+	XEKEY_SPECIAL_DVD_HCRT_OBFUSCATION_KEY = 0x4B,
+	XEKEY_SPECIAL_ROAMABLE_OBFUSCATION_KEY = 0x4C,
+	XEKEY_SPECIAL_DATA_CENTER_KEY = 0x4D,
+	XEKEY_MAX_CONSTANT_INDEX = 0x4E,
 	// title keys
 	XEKEY_TITLE_KEYS_BASE = 0xE0,
 	XEKEY_TITLE_KEYS_LIMIT = 0xE8,
@@ -133,5 +140,34 @@ typedef struct _XEKEYS_EXEC_HEADER {
 	DWORD Size; // 0xC must be 0x10 aligned and > 0x120
 	BYTE bNonce[0x10]; // data used to decrypt
 } XEKEYS_EXEC_HEADER, *PXEKEYS_EXEC_HEADER;
+
+typedef struct _XEIKA_ODD_DATA { 
+	BYTE Version; // 0x0 sz:0x1
+	BYTE PhaseLevel; // 0x1 sz:0x1
+	BYTE InquiryData[0x24]; // 0x2 sz:0x24
+} XEIKA_ODD_DATA, *PXEIKA_ODD_DATA; // size 38
+C_ASSERT(sizeof(XEIKA_ODD_DATA) == 0x26);
+
+// this is returned by XEKEY_XEIKA_CERTIFICATE, dev doesn't seem to have osig data
+typedef struct _XEIKA_DATA { 
+	XECRYPT_RSAPUB_2048 PublicKey; // 0x0 sz:0x110
+	DWORD Signature; // 0x110 sz:0x4 typically XEIKA_DATA_SIGNATURE
+	WORD Version; // 0x114 sz:0x2
+	XEIKA_ODD_DATA OddData; // 0x116 sz:0x26
+	BYTE Padding[0x4]; // 0x13C sz:0x4
+} XEIKA_DATA, *PXEIKA_DATA; // size 320
+C_ASSERT(sizeof(XEIKA_DATA) == 0x140); 
+
+#pragma pack(push, 1)
+typedef struct _XEIKA_CERTIFICATE { 
+	WORD Size; // 0x0 sz:0x2
+	XEIKA_DATA Data; // 0x2 sz:0x140
+	BYTE Padding[0x1146]; // 0x142 sz:0x1146
+	BYTE Reserved[0x100]; // 0x1288 sz:0x100
+} XEIKA_CERTIFICATE, *PXEIKA_CERTIFICATE; // size 5000
+C_ASSERT(sizeof(XEIKA_CERTIFICATE) == 0x1388);
+#pragma pack(pop)
+
+
 
 #endif // __KEXEKEYS_H

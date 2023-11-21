@@ -23,10 +23,7 @@
     <ClInclude Include="ini.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xam.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="utilities.h">
+    <ClInclude Include="Utilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="HUD.h">
@@ -35,16 +32,43 @@
     <ClInclude Include="xshell.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="HvExpansion.h">
+    <ClInclude Include="HV.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="OffsetManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RPC.h">
+    <ClInclude Include="Offsets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Flash.cpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Flash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RGLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XBDM.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyVault.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Globals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Structs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Prototypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -58,10 +82,7 @@
     <ClCompile Include="ini.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="xam.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="utilities.cpp">
+    <ClCompile Include="Utilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="xshell.cpp">
@@ -70,16 +91,28 @@
     <ClCompile Include="HUD.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HvExpansion.cpp">
+    <ClCompile Include="HV.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OffsetManager.cpp">
+    <ClCompile Include="Offsets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RGLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RPC.cpp">
+    <ClCompile Include="XBDM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KeyVault.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Globals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

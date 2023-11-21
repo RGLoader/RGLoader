@@ -16,10 +16,13 @@ typedef QWORD near           *PQWORD;
 typedef QWORD far            *LPQWORD;
 
 #define CONSTANT_OBJECT_STRING(s)   { strlen( s ) / sizeof( OCHAR ), (strlen( s ) / sizeof( OCHAR ))+1, s }
-#define MAKE_STRING(s)   {(USHORT)(strlen(s)), (USHORT)((strlen(s))+1), (PCHAR)s}
+#define CMAKE_STRING(s)   {(USHORT)(sizeof(s)-1), (USHORT)(sizeof(s)), (PCHAR)s} // use in declarations
+#define MAKE_STRING(s)   {(USHORT)(strlen(s)), (USHORT)((strlen(s))+1), (PCHAR)s} // use in code
 #define EXPORTNUM(x) // Just for documentation, thx XBMC!
 
 #define STATUS_SUCCESS	0
+#define STATUS_UNSUCCESSFUL             ((NTSTATUS) 0xC0000001)
+#define STATUS_MEMORY_NOT_ALLOCATED     ((NTSTATUS) 0xC00000A0)
 #define NT_EXTRACT_ST(Status)			((((ULONG)(Status)) >> 30)& 0x3)
 #define NT_SUCCESS(Status)              (((NTSTATUS)(Status)) >= 0)
 #define NT_INFORMATION(Status)          (NT_EXTRACT_ST(Status) == 1)
@@ -28,13 +31,17 @@ typedef QWORD far            *LPQWORD;
 
 #define NEG_ONE_AS_DWORD				((DWORD)-1)
 
+#ifndef ANY_SIZE
+#define ANY_SIZE		1
+#endif
+
 typedef long			NTSTATUS;
 typedef ULONG			ACCESS_MASK;
 
 typedef struct _STRING {
-    USHORT Length;
-    USHORT MaximumLength;
-    PCHAR Buffer;
+	USHORT Length;
+	USHORT MaximumLength;
+	PCHAR Buffer;
 } STRING, *PSTRING;
 
 typedef struct _CSTRING {
@@ -73,11 +80,12 @@ typedef CONST UNICODE_STRING*	PCUNICODE_STRING;
 
 typedef struct _IO_STATUS_BLOCK {
 	union {
-		NTSTATUS Status;
-		PVOID Pointer;
+		NTSTATUS Status; // 0x0 sz:0x4
+		void * Pointer; // 0x0 sz:0x4
 	} st;
-	ULONG_PTR Information;
-} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+	ULONG_PTR Information; // 0x4 sz:0x4
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK; // size 8
+C_ASSERT(sizeof(IO_STATUS_BLOCK) == 0x8);
 
 typedef VOID (NTAPI *PIO_APC_ROUTINE) (
 	IN PVOID ApcContext,
@@ -101,6 +109,11 @@ typedef struct _OBJECT_ATTRIBUTES {
 	(p)->Attributes = attrib;                             \
 	(p)->ObjectName = name;                               \
 }
+
+typedef struct _OBJECT_DIRECTORY_INFORMATION{
+	STRING Name;
+	DWORD Type;
+} OBJDIR_INFORMATION, *POBJDIR_INFORMATION; // 12b
 
 #ifndef NULL
 #define NULL	0

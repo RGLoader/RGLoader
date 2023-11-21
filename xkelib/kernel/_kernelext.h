@@ -6,11 +6,13 @@
 #include "keFileInfo.h"
 #include "keXexInfo.h"
 #include "kePrivateStructs.h"
+#include "keDriver.h"
 #include "keXeCrypt.h"
 #include "keXeKeys.h"
 #include "keXConfig.h"
 #include "keSmc.h"
 #include "keNand.h"
+#include "kernelExpEnum.h"
 
 #define OBJ_SYS_STRING	"\\System??\\%s"
 #define OBJ_USR_STRING	"\\??\\%s"
@@ -46,25 +48,25 @@
 #define DBG_SERIAL_STS		(DWORD volatile*)0x7FEA1018
 #define DBG_SERIAL_CNTRL	(DWORD volatile*)0x7FEA101C
 
-#define FILE_DIRECTORY_FILE                     0x00000001 
-#define FILE_WRITE_THROUGH                      0x00000002 
-#define FILE_SEQUENTIAL_ONLY                    0x00000004 
-#define FILE_NO_INTERMEDIATE_BUFFERING          0x00000008 
+#define FILE_DIRECTORY_FILE                     0x00000001
+#define FILE_WRITE_THROUGH                      0x00000002
+#define FILE_SEQUENTIAL_ONLY                    0x00000004
+#define FILE_NO_INTERMEDIATE_BUFFERING          0x00000008
 
-#define FILE_SYNCHRONOUS_IO_ALERT               0x00000010 
-#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020 
-#define FILE_NON_DIRECTORY_FILE                 0x00000040 
-#define FILE_CREATE_TREE_CONNECTION             0x00000080 
+#define FILE_SYNCHRONOUS_IO_ALERT               0x00000010
+#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020
+#define FILE_NON_DIRECTORY_FILE                 0x00000040
+#define FILE_CREATE_TREE_CONNECTION             0x00000080
 
-#define FILE_COMPLETE_IF_OPLOCKED               0x00000100 
-#define FILE_NO_EA_KNOWLEDGE                    0x00000200 
-//UNUSED                                        0x00000400 
-#define FILE_RANDOM_ACCESS                      0x00000800 
+#define FILE_COMPLETE_IF_OPLOCKED               0x00000100
+#define FILE_NO_EA_KNOWLEDGE                    0x00000200
+//UNUSED                                        0x00000400
+#define FILE_RANDOM_ACCESS                      0x00000800
 
-#define FILE_DELETE_ON_CLOSE                    0x00001000 
-#define FILE_OPEN_BY_FILE_ID                    0x00002000 
-#define FILE_OPEN_FOR_BACKUP_INTENT             0x00004000 
-#define FILE_NO_COMPRESSION                     0x00008000 
+#define FILE_DELETE_ON_CLOSE                    0x00001000
+#define FILE_OPEN_BY_FILE_ID                    0x00002000
+#define FILE_OPEN_FOR_BACKUP_INTENT             0x00004000
+#define FILE_NO_COMPRESSION                     0x00008000
 
 // Valid values for object Attributes field
 #define OBJ_INHERIT             0x00000002L
@@ -107,10 +109,24 @@
 #define XEX_LOADIMG_TYPE_SYSTEM_DLL 	(XEX_LOADIMG_FLAG_DLL | XEX_LOADIMG_FLAG_TITLE_IMPORTS)
 
 // flags used by ExCreateThread
-#define EX_CREATE_FLAG_SUSPENDED	0x1 // thread created suspended
-#define EX_CREATE_FLAG_SYSTEM		0x2 // create a system thread
-//??? #define EX_CREATE_FLAG_HIDDEN		0x4 // hides the thread from debugger thread list???
-#define EX_CREATE_FLAG_TITLE_EXEC	0x100 // title execution thread
+#define EX_CREATE_FLAG_SUSPENDED		0x00000001 // thread created suspended
+#define EX_CREATE_FLAG_SYSTEM			0x00000002 // create a system thread
+#define EX_CREATE_FLAG_TLS_STATIC		0x00000008 // allocates more object memory, KPROCESS.SizeOfTlsSlots+KPROCESS.SizeOfTlsStaticData
+#define EX_CREATE_FLAG_PRIORITY1		0x00000020 // sets priority class for the thread to 1 via KeSetPriorityClassThread - foreground
+#define EX_CREATE_FLAG_PRIORITY0		0x00000040 // sets priority class for the thread to 0 via KeSetPriorityClassThread - background
+#define EX_CREATE_FLAG_RETURN_KTHREAD	0x00000080 // puts PKTHREAD into pHandle instead of the thread HANDLE
+#define EX_CREATE_FLAG_TITLE_EXEC		0x00000100 // title execution thread
+#define EX_CREATE_FLAG_HIDDEN			0x00000400 // hides the thread from debugger thread list
+// { more in here in regards to thread scheduler }
+#define EX_CREATE_FLAG_CORE0			0x01000000 // threads starts on 1st cpu core
+#define EX_CREATE_FLAG_CORE1			0x02000000 // threads starts on 2nd cpu core
+#define EX_CREATE_FLAG_CORE2			0x04000000 // threads starts on 3rd cpu core
+#define EX_CREATE_FLAG_CORE3			0x08000000 // threads starts on 4th cpu core
+#define EX_CREATE_FLAG_CORE4			0x10000000 // threads starts on 5th cpu core
+#define EX_CREATE_FLAG_CORE5			0x20000000 // threads starts on 6th cpu core
+
+// Can be used instead of module name to get module address where XexGetModuleHandle() is called
+#define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS	(PSZ)(-1)
 
 typedef enum _POOL_TYPE {
 	PoolTypeThread = 0x0,
@@ -132,6 +148,18 @@ typedef enum { // effects on jtag noted in comment
 	HalPowerCycleQuiesceRoutine = 0x8,
 	HalMaximumRoutine = 0x9,
 } FIRMWARE_REENTRY;
+
+typedef enum _HAL_GPIO_ACTION { // DWORD HalGpioControl(HAL_GPIO_ACTION enAction, DWORD AddMask, DWORD RemoveMask);
+	HalGpioOutputEnable = 0x0, 		// modifies value at 0x7FEA1020 via add/remove mask, returns what it wrote
+	HalGpioOutputType = 0x1, 		// modifies value at 0x7FEA1024 via add/remove mask, returns what it wrote
+	HalGpioAlternateFunction = 0x2, // modifies value at 0x7FEA1028 via add/remove mask, returns what it wrote
+	HalGpioOutputData = 0x3, 		// modifies value at 0x7FEA1030 via add/remove mask, returns what it wrote
+	HalGpioOutputDataSet = 0x4, 	// writes AddMask verbatim to 0x7FEA1034, RemoveMask is ignored, returns 0
+	HalGpioOutputDataClear = 0x5, 	// writes AddMask verbatim to 0x7FEA1038, RemoveMask is ignored, returns 0
+	HalGpioInputData = 0x6, 		// reads and returns value at 0x7FEA1040 regardless of add/remove mask
+	HalGpioInputInverting = 0x7, 	// modifies value at 0x7FEA1044 via add/remove mask, returns what it wrote
+	HalGpioNoiseCancelWidth = 0x8, 	// modifies values at 0x7FEA1048, 0x7FEA104C (uses a loop and magic beans)
+} HAL_GPIO_ACTION;
 
 /* description about xex exe headers in memory */
 typedef struct _XBOX_HARDWARE_INFO {
@@ -156,7 +184,7 @@ typedef struct _EX_THREAD_REGISTRATION {
 	LIST_ENTRY ListEntry;
 } EX_THREAD_REGISTRATION, *PEX_THREAD_REGISTRATION;
 
-typedef struct _VD_NOTIFICATION_REGISTRATION { 
+typedef struct _VD_NOTIFICATION_REGISTRATION {
 	PVOID NotificationRoutine; // 0x0 sz:0x4 void(*)()
 	long Priority; // 0x4 sz:0x4
 	LIST_ENTRY ListEntry; // 0x8 sz:0x8
@@ -173,7 +201,7 @@ typedef struct _XBOX_KRNL_VERSION{
 	WORD Qfe;
 } XBOX_KRNL_VERSION, *PXBOX_KRNL_VERSION;
 
-typedef struct _KTIME_STAMP_BUNDLE { 
+typedef struct _KTIME_STAMP_BUNDLE {
 	LARGE_INTEGER InterruptTime; // 0
 	LARGE_INTEGER SystemTime; // 8
 	DWORD TickCount; // 10
@@ -183,6 +211,18 @@ typedef struct _LZX_DECOMPRESS {
 	LONG WindowSize;
 	LONG CpuType;
 } LZX_DECOMPRESS, *PLZX_DECOMPRESS;
+
+typedef struct _TIME_FIELDS { 
+	SHORT Year; // 0x0 sz:0x2
+	SHORT Month; // 0x2 sz:0x2
+	SHORT Day; // 0x4 sz:0x2
+	SHORT Hour; // 0x6 sz:0x2
+	SHORT Minute; // 0x8 sz:0x2
+	SHORT Second; // 0xA sz:0x2
+	SHORT Milliseconds; // 0xC sz:0x2
+	SHORT Weekday; // 0xE sz:0x2
+} TIME_FIELDS, *PTIME_FIELDS; // size 16
+C_ASSERT(sizeof(TIME_FIELDS) == 0x10);
 
 #ifdef __cplusplus
 extern "C" {
@@ -195,6 +235,14 @@ extern "C" {
 	DbgPrint(
 		IN		const char* s,
 		...
+	);
+
+	NTSYSAPI
+	EXPORTNUM(7)
+	VOID
+	NTAPI
+	ExAcquireReadWriteLockExclusive(
+		IN OUT	PERWLOCK pExReadWriteLock
 	);
 
 	// http://msdn.microsoft.com/en-us/library/ff544520%28v=vs.85%29.aspx
@@ -246,13 +294,16 @@ extern "C" {
 		IN		DWORD dwCreationFlagsMod
 	);
 
+	EXPORTNUM(14)
+	extern POBJECT_TYPE ExEventObjectType;
+
 	NTSYSAPI
 	EXPORTNUM(15)
 	VOID
 	NTAPI
 	ExFreePool(
 		IN PVOID  pPool
-    );
+	);
 
 	NTSYSAPI
 	EXPORTNUM(16)
@@ -266,6 +317,17 @@ extern "C" {
 		OUT		PWORD szSetting
 	);
 	
+	NTSYSAPI
+	EXPORTNUM(17)
+	VOID
+	NTAPI
+	ExInitializeReadWriteLock(
+		IN OUT	PERWLOCK pExReadWriteLock
+	);
+	
+	EXPORTNUM(18)
+	extern POBJECT_TYPE ExMutantObjectType;
+
 	NTSYSAPI
 	EXPORTNUM(20)
 	VOID
@@ -284,6 +346,9 @@ extern "C" {
 		IN		BOOL bCreate // true create, false destroy existing
 	);
 
+	EXPORTNUM(23)
+	extern POBJECT_TYPE ExSemaphoreObjectType;
+
 	NTSYSAPI
 	EXPORTNUM(24)
 	NTSTATUS
@@ -301,7 +366,21 @@ extern "C" {
 	NTAPI
 	ExTerminateThread(
 		IN DWORD  exitCode
-    );
+	);
+
+	EXPORTNUM(27)
+	extern POBJECT_TYPE ExThreadObjectType;
+
+	EXPORTNUM(28)
+	extern POBJECT_TYPE ExTimerObjectType;
+
+	NTSYSAPI
+	EXPORTNUM(31)
+	VOID
+	NTAPI
+	XeKeysGetConsoleCertificate(
+		OUT		PXE_CONSOLE_CERTIFICATE pConsoleCert
+	);
 
 	NTSYSAPI
 	EXPORTNUM(36)
@@ -309,6 +388,29 @@ extern "C" {
 	NTAPI
 	HalOpenCloseODDTray(
 		IN		DWORD setTray
+	);
+
+	NTSYSAPI
+	EXPORTNUM(37)
+	VOID
+	NTAPI
+	HalReadWritePCISpace(
+		IN		BYTE Bus,
+		IN		BYTE Device,
+		IN		BYTE Function,
+		IN		DWORD offset, // offset from 0 in pci bus+device+function
+		IN OUT	PVOID pBuffer,
+		IN      DWORD cbBuffer,
+		OUT     BOOL isWrite // true if writing, false if reading
+	);
+
+	NTSYSAPI
+	EXPORTNUM(39)
+	VOID
+	NTAPI
+	HalRegisterSMCNotification(
+		IN OUT	PHAL_SMC_REGISTRATION pSmcRegistration,
+		IN		BOOL bUnk // seems to be 1 for create and 0 for remove?
 	);
 
 	NTSYSAPI
@@ -329,6 +431,98 @@ extern "C" {
 		OUT		LPVOID pRecvBuffer
 	);
 
+	// similar to KfAcquireSpinLock, but acquires lock in kernel on IopDeviceObjectLock
+	NTSYSAPI
+	EXPORTNUM(46)
+	BYTE
+	NTAPI
+	IoAcquireDeviceObjectLock(
+		VOID
+	);
+
+	NTSYSAPI
+	EXPORTNUM(47)
+	PIRP
+	NTAPI
+	IoAllocateIrp(
+		IN		BYTE StackSize
+	);
+
+	NTSYSAPI
+	EXPORTNUM(48)
+	PIRP
+	NTAPI
+	IoBuildAsynchronousFsdRequest(
+		IN		DWORD MajorFunction,
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN OUT	PVOID Buffer,
+		IN		DWORD Length OPTIONAL,
+		IN		PLARGE_INTEGER StartingOffset OPTIONAL,
+		IN		PIO_STATUS_BLOCK IoStatusBlock OPTIONAL
+	);
+
+	NTSYSAPI
+	EXPORTNUM(49)
+	PIRP
+	NTAPI
+	IoBuildDeviceIoControlRequest(
+		IN		DWORD IoControlCode,
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN		PVOID InputBuffer OPTIONAL,
+		IN		DWORD InputBufferLength,
+		IN		PVOID OutputBuffer OPTIONAL,
+		IN		DWORD OutputBufferLength,
+		IN		PKEVENT pEvent OPTIONAL,
+		IN OUT	PIO_STATUS_BLOCK pIoStatusBlock
+	);
+
+	NTSYSAPI
+	EXPORTNUM(50)
+	PIRP
+	NTAPI
+	IoBuildSynchronousFsdRequest(
+		IN		DWORD MajorFunction,
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN OUT	PVOID Buffer,
+		IN		DWORD Length OPTIONAL,
+		IN		PLARGE_INTEGER StartingOffset OPTIONAL,
+		IN		PKEVENT pEvent,
+		IN		PIO_STATUS_BLOCK IoStatusBlock OPTIONAL
+	);
+
+	NTSYSAPI
+	EXPORTNUM(51)
+	NTSTATUS
+	NTAPI
+	IoCallDriver(
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN OUT	PIRP pIrp
+	);
+
+	NTSYSAPI
+	EXPORTNUM(52)
+	NTSTATUS
+	NTAPI
+	IoCheckShareAccess(
+		IN		DWORD DesiredAccess,
+		IN		DWORD DesiredShareAccess,
+		IN OUT	PFILE_OBJECT  FileObject,
+		IN OUT	PSHARE_ACCESS ShareAccess,
+		IN		BOOL Update
+	);
+
+	NTSYSAPI
+	EXPORTNUM(53)
+	VOID
+	NTAPI
+	IoCompleteRequest(
+		IN OUT		void* pIrp, // PIRP
+		IN OUT		DWORD unk // CHAR PriorityBoost?
+	);
+
+	EXPORTNUM(54)
+	extern POBJECT_TYPE IoCompletionObjectType;
+
 	NTSYSAPI
 	EXPORTNUM(55)
 	NTSTATUS
@@ -343,6 +537,46 @@ extern "C" {
 		OUT		PDEVICE_OBJECT *DeviceObject
 	);
 
+	NTSYSAPI
+	EXPORTNUM(57)
+	VOID
+	NTAPI
+	IoDeleteDevice(
+		IN		PDEVICE_OBJECT pDeviceObject
+	);
+
+	EXPORTNUM(58)
+	extern POBJECT_TYPE IoDeviceObjectType;
+
+	EXPORTNUM(62)
+	extern POBJECT_TYPE IoFileObjectType;
+
+	NTSYSAPI
+	EXPORTNUM(63)
+	VOID
+	NTAPI
+	IoFreeIrp(
+		IN		PIRP pIrp
+	);
+
+	NTSYSAPI
+	EXPORTNUM(64)
+	VOID
+	NTAPI
+	IoInitializeIrp(
+		IN OUT	PIRP pIrp,
+		IN		BYTE StackSize
+	);
+
+	NTSYSAPI
+	EXPORTNUM(65)
+	NTSTATUS
+	NTAPI
+	IoInvalidDeviceRequest(
+		IN OUT		void* pDeviceObject, // PDEVICE_OBJECT
+		IN OUT		void* pIrp // PIRP
+	);
+
 	// returns STATUS_ACCESS_DENIED if not called by a system thread
 	NTSYSAPI
 	EXPORTNUM(66)
@@ -353,11 +587,112 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(67)
+	VOID
+	NTAPI
+	IoQueueThreadIrp(
+		IN		PIRP pIrp
+	);
+
+	// use this to release IopDeviceObjectLock aquired with IoAcquireDeviceObjectLock
+	NTSYSAPI
+	EXPORTNUM(68)
+	VOID
+	NTAPI
+	IoReleaseDeviceObjectLock(
+		IN		BYTE oldIrql
+	);
+
+	NTSYSAPI
+	EXPORTNUM(71)
+	VOID
+	NTAPI
+	IoSetShareAccess(
+		IN		DWORD DesiredAccess,
+		IN		DWORD DesiredShareAccess,
+		IN OUT	PFILE_OBJECT  FileObject,
+		OUT		PSHARE_ACCESS ShareAccess
+	);
+
+	NTSYSAPI
+	EXPORTNUM(72)
+	VOID
+	NTAPI
+	IoStartNextPacket(
+		IN		PDEVICE_OBJECT DeviceObject
+	);
+
+	NTSYSAPI
+	EXPORTNUM(73)
+	VOID
+	NTAPI
+	IoStartNextPacketByKey(
+		IN		PDEVICE_OBJECT DeviceObject,
+		IN		DWORD key
+	);
+
+	NTSYSAPI
+	EXPORTNUM(74)
+	VOID
+	NTAPI
+	IoStartPacket(
+		IN		PDEVICE_OBJECT DeviceObject,
+		IN		PIRP pIrp,
+		IN		DWORD key OPTIONAL
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(75)
+	NTSTATUS
+	NTAPI
+	IoSynchronousDeviceIoControlRequest(
+		IN		DWORD IoControlCode,
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN		PVOID InputBuffer OPTIONAL,
+		IN		DWORD InputBufferLength,
+		IN		PVOID OutputBuffer OPTIONAL,
+		IN		DWORD OutputBufferLength,
+		IN OUT	PDWORD pIoStatusInfo OPTIONAL // the result from iostatus.information is placed here if present
+	);
+
+	NTSYSAPI
+	EXPORTNUM(76)
+	PIRP
+	NTAPI
+	IoSynchronousFsdRequest(
+		IN		DWORD MajorFunction,
+		IN		PDEVICE_OBJECT pDeviceObject,
+		IN OUT	PVOID Buffer,
+		IN		DWORD Length,
+		IN		PLARGE_INTEGER StartingOffset
+	);
+
+	NTSYSAPI
 	EXPORTNUM(77)
 	VOID
 	NTAPI
 	KeAcquireSpinLockAtRaisedIrql(
 		IN OUT	PDWORD spinVar
+	);
+
+	NTSYSAPI
+	EXPORTNUM(82)
+	VOID
+	NTAPI
+	KeBugCheck(
+		IN		DWORD BugCheckCode
+	);
+
+	NTSYSAPI
+	EXPORTNUM(83)
+	VOID
+	NTAPI
+	KeBugCheckEx(
+		IN		DWORD BugCheckCode,
+		IN		DWORD BugCheckParameter1,
+		IN		DWORD BugCheckParameter2,
+		IN		DWORD BugCheckParameter3,
+		IN		DWORD BugCheckParameter4 
 	);
 
 	NTSYSAPI
@@ -406,6 +741,70 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(109)
+	VOID
+	NTAPI
+	KeInitializeApc(
+		IN		PKAPC Apc,
+		IN		PKTHREAD Thread,
+		IN		PKKERNEL_ROUTINE KernelRoutine,
+		IN		PKRUNDOWN_ROUTINE RundownRoutine OPTIONAL,
+		IN		PKNORMAL_ROUTINE NormalRoutine OPTIONAL, // UserApcRoutine
+		IN		KPROCESSOR_MODE Mode,
+		IN		PVOID Context 
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(112)
+	VOID
+	NTAPI
+	KeInitializeEvent(
+		IN OUT	PKEVENT Event,
+		IN		DWORD Type,
+		IN		BOOL State
+	);
+
+	NTSYSAPI
+	EXPORTNUM(118)
+	BOOL
+	NTAPI
+	KeInsertByKeyDeviceQueue(
+		IN OUT	PKDEVICE_QUEUE DeviceQueue,
+		IN OUT	PKDEVICE_QUEUE_ENTRY DeviceQueueEntry, // part of IRP overlay
+		IN		DWORD key
+	);
+
+	NTSYSAPI
+	EXPORTNUM(119)
+	BOOL
+	NTAPI
+	KeInsertDeviceQueue(
+		IN OUT	PKDEVICE_QUEUE DeviceQueue,
+		IN OUT	PKDEVICE_QUEUE_ENTRY DeviceQueueEntry // part of IRP overlay
+	);
+
+	NTSYSAPI
+	EXPORTNUM(122)
+	BOOL
+	NTAPI
+	KeInsertQueueApc(
+		IN		PKAPC Apc,
+		IN		PVOID SystemArgument1,
+		IN		PVOID SystemArgument2,
+		IN		DWORD PriorityBoost // KPRIORITY
+	);
+
+	NTSYSAPI
+	EXPORTNUM(123)
+	BOOL
+	NTAPI
+	KeInsertQueueDpc(
+		IN		PKDPC Dpc,
+		IN		PVOID SystemArgument1 OPTIONAL,
+		IN		PVOID SystemArgument2 OPTIONAL
+	);
+
+	NTSYSAPI
 	EXPORTNUM(124)
 	PDWORD
 	NTAPI
@@ -429,6 +828,15 @@ extern "C" {
 	KeQuerySystemTime(
 		OUT		PFILETIME CurrentTime // LARGE_INTEGER
 	);
+
+	// lower with KfLowerIrql - DPC IRQL is 2
+	NTSYSAPI
+	EXPORTNUM(133)
+	BYTE
+	NTAPI
+	KeRaiseIrqlToDpcLevel(
+		VOID
+	);
 	
 	NTSYSAPI
 	EXPORTNUM(134)
@@ -436,7 +844,7 @@ extern "C" {
 	NTAPI
 	KeRegisterDriverNotification(
 		IN OUT	PKDRIVER_NOTIFICATION_REGISTRATION pDriverNotification,
-		IN		DWORD dwNotificationType // _KDRIVER_NOTIFICATION_TYPE
+		IN		KDRIVER_NOTIFICATION_TYPE dwNotificationType // _KDRIVER_NOTIFICATION_TYPE
 	);
 
 	NTSYSAPI
@@ -448,11 +856,45 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(138)
+	PKDEVICE_QUEUE_ENTRY
+	NTAPI
+	KeRemoveByKeyDeviceQueue(
+		IN OUT	PKDEVICE_QUEUE DeviceQueue,
+		IN OUT	DWORD key
+	);
+
+	NTSYSAPI
+	EXPORTNUM(139)
+	PKDEVICE_QUEUE_ENTRY
+	NTAPI
+	KeRemoveDeviceQueue(
+		IN OUT	PKDEVICE_QUEUE DeviceQueue
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(143)
+	VOID
+	NTAPI
+	KeResetEvent(
+		IN OUT	PKEVENT Event
+	);
+
+	NTSYSAPI
 	EXPORTNUM(146)
 	VOID
 	NTAPI
 	KeResumeThread(
-		IN	PKTHREAD thread
+		IN		PKTHREAD thread
+	);
+
+	NTSYSAPI
+	EXPORTNUM(153)
+	LONG
+	NTAPI
+	KeSetBasePriorityThread(
+		IN OUT	PKTHREAD Thread,
+		IN		LONG Increment
 	);
 
 	NTSYSAPI
@@ -468,9 +910,9 @@ extern "C" {
 	HRESULT
 	NTAPI
 	KeSetEvent(
-		IN 		HANDLE  Event,
-		IN		DWORD  Increment,
-		IN		BOOL  Wait
+		IN 		PKEVENT Event,
+		IN		DWORD Increment,
+		IN		BOOL Wait
 	);
 
 	NTSYSAPI
@@ -486,7 +928,7 @@ extern "C" {
 	VOID
 	NTAPI
 	KeSuspendThread(
-		IN	PKTHREAD thread
+		IN		PKTHREAD thread
 	);
 
 	EXPORTNUM(173)
@@ -494,12 +936,12 @@ extern "C" {
 
 	NTSYSAPI
 	EXPORTNUM(176)
-	NTSTATUS 
+	NTSTATUS
 	NTAPI
 	KeWaitForSingleObject(
 		IN		PVOID Object,
 		IN		KWAIT_REASON WaitReason,
-		IN		KPROCESSOR_MODE WaitMode,
+		IN		WAIT_MODE WaitMode,
 		IN		BOOL Alertable,
 		IN		PLARGE_INTEGER Timeout OPTIONAL
 	);
@@ -587,7 +1029,29 @@ extern "C" {
 	MmAllocatePhysicalMemory(
 		IN		DWORD type, // 0 (2 for system?)
 		IN		DWORD size, // 1
-		IN		DWORD accessFlags //0x20000004 - gives 1 64k phy alloc
+		IN		DWORD protect //0x20000004 - gives 1 64k phy alloc
+	);
+
+	NTSYSAPI
+	EXPORTNUM(186)
+	PVOID
+	NTAPI
+	MmAllocatePhysicalMemoryEx(
+		IN		DWORD type,  // 0 (2 for system?)
+		IN		DWORD size,  // 1
+		IN		DWORD protect,  //0x20000004 - gives 1 64k phy alloc
+		IN		DWORD minaddr,
+		IN		DWORD maxaddr,
+		IN		DWORD align
+	);
+
+	NTSYSAPI
+	EXPORTNUM(189)
+	VOID
+	NTAPI
+	MmFreePhysicalMemory(
+		IN		DWORD type,  // 0 (2 for system?)
+		IN		PVOID alloc
 	);
 
 	NTSYSAPI
@@ -660,6 +1124,15 @@ extern "C" {
 		IN		HANDLE Handle
 	);
 
+	 NTSYSAPI
+	 EXPORTNUM(208)
+	 NTSTATUS
+	 NTAPI
+	 NtCreateDirectoryObject(
+		 OUT	PHANDLE DirectoryHandle,
+		 IN		POBJECT_ATTRIBUTES ObjectAttributes
+	 );
+
 	NTSYSAPI
 	EXPORTNUM(210)
 	NTSTATUS
@@ -700,6 +1173,16 @@ extern "C" {
 		IN		DWORD InputBufferLength,
 		OUT		PVOID OutputBuffer OPTIONAL,
 		IN		DWORD OutputBufferLength
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(218)
+	NTSTATUS
+	NTAPI
+	NtDuplicateObject(
+		IN		HANDLE hSourceHandle,
+		OUT		HANDLE* lpTargetHandle,
+		IN		DWORD dwOptions
 	);
 
 	NTSYSAPI
@@ -746,7 +1229,7 @@ extern "C" {
 		IN		DWORD ApcReserved OPTIONAL
 	);
 
-	NTSYSAPI 
+	NTSYSAPI
 	EXPORTNUM(228)
 	NTSTATUS
 	NTAPI
@@ -794,7 +1277,7 @@ extern "C" {
 		OUT		PVOID FileInformation,
 		IN		DWORD Length,
 		IN		FILE_INFORMATION_CLASS FileInformationClass
-	); 
+	);
 
 	NTSYSAPI
 	EXPORTNUM(236)
@@ -849,7 +1332,16 @@ extern "C" {
 		IN 		DWORD Length,
 		IN 		PLARGE_INTEGER ByteOffset,
 		IN 		PDWORD Key OPTIONAL
-	); 
+	);
+
+	NTSYSAPI
+	EXPORTNUM(246)
+	NTSTATUS
+	NTAPI
+	NtSetEvent(
+		IN		HANDLE EventHandle,
+		OUT		PLONG PreviousState OPTIONAL 
+	);	
 
 	NTSYSAPI
 	EXPORTNUM(247)
@@ -873,6 +1365,17 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(253)
+	NTSTATUS
+	NTAPI
+	NtWaitForSingleObjectEx(
+		IN		HANDLE Handle,
+		IN		DWORD WaitMode,
+		IN		BOOL Alertable,
+		IN		PLARGE_INTEGER Timeout
+	);
+
+	NTSYSAPI
 	EXPORTNUM(255)
 	NTSTATUS
 	NTAPI
@@ -885,6 +1388,17 @@ extern "C" {
 		IN		PVOID Buffer,
 		IN		DWORD Length,
 		IN		PLARGE_INTEGER ByteOffset OPTIONAL
+	);
+
+	NTSYSAPI
+	EXPORTNUM(258)
+	NTSTATUS
+	NTAPI
+	ObCreateObject(
+		IN		POBJECT_TYPE ObjectType,
+		IN		POBJECT_ATTRIBUTES ObjectAttributes,
+		IN		DWORD ObjectBodySize,
+		OUT		PVOID *Object
 	);
 
 	NTSYSAPI
@@ -912,12 +1426,34 @@ extern "C" {
 		IN		PVOID Object
 	);
 
+	EXPORTNUM(262)
+	extern POBJECT_TYPE ObDirectoryObjectType;
+
+	NTSYSAPI
+	EXPORTNUM(264)
+	NTSTATUS
+	NTAPI
+	ObInsertObject(
+		IN		PVOID Object,
+		IN		POBJECT_ATTRIBUTES ObjectAttributes, // not sure, seems it's fed this from ObCreateObject
+		IN		DWORD AdditionalReferences, // not sure on this one, could be a bool
+		OUT		PHANDLE Handle
+	);
+
+	NTSYSAPI
+	EXPORTNUM(265)
+	BOOL
+	NTAPI
+	ObIsTitleObject(
+		IN		PFILE_OBJECT pFileObject
+	);
+
 	NTSYSAPI
 	EXPORTNUM(266)
 	HRESULT
 	NTAPI
 	ObLookupAnyThreadByThreadId(
-		IN		DWORD dwThreadId, 
+		IN		DWORD dwThreadId,
 		OUT		PKTHREAD *pthr
 	);
 
@@ -930,6 +1466,31 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(272)
+	NTSTATUS
+	NTAPI
+	ObReferenceObjectByHandle(
+		IN		HANDLE Handle,
+		IN		POBJECT_TYPE ObjectType,
+		OUT		PVOID *Object
+	);
+
+	NTSYSAPI
+	EXPORTNUM(273)
+	NTSTATUS
+	NTAPI
+	ObReferenceObjectByName(
+		IN		PSTRING ObjectName,
+		IN		DWORD Attributes, // PACCESS_STATE AccessState, ACCESS_MASK DesiredAccess
+		IN		POBJECT_TYPE ObjectType,
+		IN		PVOID ParseContext OPTIONAL, // KPROCESSOR_MODE AccessMode
+		OUT		PVOID* Object
+	);
+
+	EXPORTNUM(274)
+	extern POBJECT_TYPE ObSymbolicLinkObjectType;
+
+	NTSYSAPI
 	EXPORTNUM(283)
 	int
 	NTAPI
@@ -938,6 +1499,15 @@ extern "C" {
 		IN   	DWORD Length,
 		IN   	DWORD Pattern
 	);
+
+	// just fake this one and cast to the winnt.h types to avoid conflicts
+	//NTSYSAPI
+	//EXPORTNUM(293)
+	//VOID
+	//NTAPI
+	//RtlEnterCriticalSection(
+	//	IN OUT		void* pMutex
+	//);
 
 	NTSYSAPI
 	EXPORTNUM(298)
@@ -966,6 +1536,15 @@ extern "C" {
 		IN		PCSZ  SourceString
 	);
 
+	// just fake this one and cast to the winnt.h types to avoid conflicts
+	//NTSYSAPI
+	//EXPORTNUM(304)
+	//VOID
+	//NTAPI
+	//RtlLeaveCriticalSection(
+	//	IN OUT		void* pMutex
+	//);
+
 	NTSYSAPI
 	EXPORTNUM(305)
 	PVOID
@@ -975,14 +1554,133 @@ extern "C" {
 	);
 
 	NTSYSAPI
-	EXPORTNUM(305)
-	DWORD
+	EXPORTNUM(313)
+	int
+	NTAPI
+	RtlScprintf(
+		IN		const CHAR* Format,
+		...
+	);
+
+	NTSYSAPI
+	EXPORTNUM(314)
+	int
+	NTAPI
+	RtlSnprintf(
+		IN		CHAR* Buffer,
+		IN		int SizeInBytes,
+		IN		const CHAR* Format,
+		...
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(315)
+	int
 	NTAPI
 	RtlSprintf(
+		IN		CHAR* Buffer,
+		IN		const CHAR* Format,
+		...
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(316)
+	int
+	NTAPI
+	RtlScwprintf(
+		IN		const WCHAR* Format,
+		...
+	);
+
+	NTSYSAPI
+	EXPORTNUM(317)
+	int
+	NTAPI
+	RtlSnwprintf(
+		IN		WCHAR * Buffer,
+		IN		DWORD MaxLength,
+		IN		LPCWSTR Format,
+		...
+	);	
+
+	NTSYSAPI
+	EXPORTNUM(318)
+	int
+	NTAPI
+	RtlSwprintf(
+		IN		WCHAR * Buffer,
+		IN		LPCWSTR Format,
+		...
+	);
+
+	NTSYSAPI
+	EXPORTNUM(320)
+	NTSTATUS
+	NTAPI
+	RtlTimeToTimeFields(
+		IN		PFILETIME Time, // feed with result from KeQuerySystemTime
+		OUT		PTIME_FIELDS TimeFields
+	);
+
+	NTSYSAPI
+	EXPORTNUM(332)
+	int
+	NTAPI
+	RtlVscprintf(
+		IN		const CHAR* Format, 
+		IN		va_list va
+	);
+
+	NTSYSAPI
+	EXPORTNUM(333)
+	int
+	NTAPI
+	RtlVsnprintf(
+		IN		CHAR* Buffer, 
+		IN		int SizeInBytes, 
+		IN		const CHAR* Format, 
+		IN		va_list va
+	);
+	
+	NTSYSAPI
+	EXPORTNUM(334)
+	int
+	NTAPI
+	RtlVsprintf(
 		IN		CHAR* Buffer, 
 		IN		const CHAR* Format, 
-		...
-		);
+		IN		va_list va
+	);
+
+	NTSYSAPI
+	EXPORTNUM(335)
+	int
+	NTAPI
+	RtlVscwprintf(
+		IN		const WCHAR* Format, 
+		IN		va_list va
+	);
+
+	NTSYSAPI
+	EXPORTNUM(336)
+	int
+	NTAPI
+	RtlVsnwprintf(
+		IN		WCHAR* Buffer,
+		IN		int SizeInBytes,
+		IN		const WCHAR* Format,
+		IN		va_list va
+	);
+
+	NTSYSAPI
+	EXPORTNUM(337)
+	int
+	NTAPI
+	RtlVswprintf(
+		IN		WCHAR* Buffer,
+		IN		const WCHAR* Format,
+		IN		va_list va
+	);
 
 	EXPORTNUM(342)
 	extern PXBOX_HARDWARE_INFO XboxHardwareInfo;
@@ -1015,7 +1713,7 @@ extern "C" {
 	XexGetModuleHandle(
 		IN		PSZ moduleName,
 		IN OUT	PHANDLE hand
-	); 
+	);
 
 	// ie XexGetProcedureAddress(hand ,0x50, &addr) returns 0 on success
 	NTSYSAPI
@@ -1094,7 +1792,7 @@ extern "C" {
 	NTAPI
 	XexUnloadImageAndExitThread(
 		IN		HANDLE moduleHandle,
-		IN		HANDLE threadHandle
+		IN		DWORD exitCode
 	);
 
 	NTSYSAPI
@@ -1122,6 +1820,14 @@ extern "C" {
 	
 	EXPORTNUM(431)
 	extern PCHAR ExLoadedImageName; // max size 0x100 ie: "\Device\Mass0\xexloader_testing\default.xex"
+
+	NTSYSAPI
+	EXPORTNUM(434)
+	VOID
+	NTAPI
+	VdDisplayFatalError(
+		IN		DWORD dwErrorCode
+	);
 
 	NTSYSAPI
 	EXPORTNUM(442)
@@ -1160,9 +1866,23 @@ extern "C" {
 	NTSTATUS
 	NTAPI
 	XInputdReadState(
-		IN		PDWORD DeviceContext,
+		IN		DWORD dwDeviceContext,
 		OUT		PDWORD pdwPacketNumber,
-		OUT		PXINPUT_GAMEPAD pInputData
+		OUT		PXINPUT_GAMEPAD pInputData,
+		IN OUT	PBOOL pbUnknown OPTIONAL
+	);
+
+	NTSYSAPI
+	EXPORTNUM(487)
+	NTSTATUS
+	NTAPI
+	XInputdWriteState(
+		IN		DWORD DeviceContext,
+		IN		DWORD dwVibrationLevel,
+		IN		VOID* pInputData, // PXINPUT_GAMEPAD PXINPUT_OUTPUT_DATA
+		IN 		BYTE bAmplitude,
+		IN 		BYTE bFrequency,
+		IN 		BYTE bOffset
 	);
 
 	NTSYSAPI
@@ -1301,6 +2021,15 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(598)
+	VOID
+	NTAPI
+	XeKeysConsolePrivateKeySign(
+		IN		BYTE* pbHash,
+		OUT		PXE_CONSOLE_SIGNATURE pConsoleSignature
+	);
+
+	NTSYSAPI
 	EXPORTNUM(599)
 	BOOL
 	NTAPI
@@ -1348,6 +2077,15 @@ extern "C" {
 	);
 
 	NTSYSAPI
+	EXPORTNUM(629)
+	NTSTATUS
+	NTAPI
+	XexTransformImageKey(
+		IN OUT	PVOID pBuf,
+		IN		DWORD cbLength
+	);
+
+	NTSYSAPI
 	EXPORTNUM(650)
 	NTSTATUS
 	NTAPI
@@ -1389,6 +2127,16 @@ extern "C" {
 	);
 
 	// NTSYSAPI
+	// EXPORTNUM(111)
+	// VOID
+	// NTAPI
+	// KeInitializeDpc(
+		// OUT		PKDPC Dpc,
+		// IN		PVOID DeferredRoutine,
+		// IN		PVOID DeferredContext OPTIONAL
+	// );
+
+	// NTSYSAPI
 	// EXPORTNUM(113)
 	// VOID
 	// NTAPI
@@ -1409,70 +2157,30 @@ extern "C" {
 		// IN		PKINTERRUPT InterruptObject
 	// );
 
-	// NTSYSAPI
-	// EXPORTNUM(111)
-	// VOID
-	// NTAPI
-	// KeInitializeDpc(
-		// OUT		PKDPC Dpc,
-		// IN		PVOID DeferredRoutine,
-		// IN		PVOID DeferredContext OPTIONAL
-	// );
 
+	
 
-	// NTSYSAPI
-	// EXPORTNUM(208)
-	// NTSTATUS
-	// NTAPI
-	// NtCreateDirectoryObject(
-		// OUT		PHANDLE DirectoryHandle,
-		// IN		POBJECT_ATTRIBUTES ObjectAttributes
-	// );
+// haven't had any reason to touch on these Io functions as of yet
+// IoSetIoCompletion @70
+// IoCreateFile @56
+// IoDismountVolume @59
+// IoDismountVolumeByFileHandle @60
+// IoDismountVolumeByName @61
+// IoCheckShareAccess @52
+// IoRemoveShareAccess @69
+// IoSetShareAccess @71
+	
 
-	// NTSYSAPI
-	// EXPORTNUM(272)
-	// NTSTATUS
-	// NTAPI
-	// ObReferenceObjectByHandle(
-		// IN		HANDLE Handle,
-		// IN		POBJECT_TYPE ObjectType,
-		// OUT		PVOID *Object
-	// );
-
-	// NTSYSAPI
-	// EXPORTNUM(258)
-	// NTSTATUS
-	// NTAPI
-	// ObCreateObject(
-		// IN		POBJECT_TYPE ObjectType,
-		// IN		POBJECT_ATTRIBUTES ObjectAttributes,
-		// IN		DWORD ObjectBodySize,
-		// OUT		PVOID *Object
-	// );
-
-	// NTSYSAPI
-	// EXPORTNUM(264)
-	// NTSTATUS
-	// NTAPI
-	// ObInsertObject(
-		// IN		PVOID Object,
-		// IN		POBJECT_ATTRIBUTES ObjectAttributes, // not sure, seems it's fed this from ObCreateObject
-		// IN		DWORD AdditionalReferences, // not sure on this one, could be a bool
-		// OUT		PHANDLE Handle
-	// );
-
-	// NTSYSAPI
-	// EXPORTNUM(273)
-	// NTSTATUS
-	// NTAPI
-	// ObReferenceObjectByName(
-		// IN		PSTRING ObjectName,
-		// IN		DWORD Attributes, // PACCESS_STATE AccessState, ACCESS_MASK DesiredAccess
-		// IN		POBJECT_TYPE ObjectType,
-		// IN		PVOID ParseContext OPTIONAL, // KPROCESSOR_MODE AccessMode
-		// OUT		PVOID* Object
-	// );
-		 
+	// note in the case of HalGpioNoiseCancelWidth action, add/remove does not apply
+	NTSYSAPI
+	EXPORTNUM(35)
+	NTSTATUS
+	NTAPI
+	HalGpioControl(
+		IN		HAL_GPIO_ACTION enAction,
+		IN		DWORD AddMask,
+		IN		DWORD RemoveMask
+	);
 
 #ifdef __cplusplus
 }

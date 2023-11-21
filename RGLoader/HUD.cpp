@@ -1,7 +1,4 @@
-#include "HUD.h"
-//#include "KernelExports.h"
-
-OffsetManager offsetmanager;
+#include "stdafx.h"
 
 HANDLE SearchForHandle(const char* mName) {
 
@@ -32,7 +29,6 @@ HANDLE SearchForHandle(const char* mName) {
 
 
 void ReplaceHudString( const char* newtext, DWORD addr, int length){
-
 	char* temp = new char[length+1];
 	for(int i=0; i<length; i++) temp[i]=' ';
 	temp[length]='\0';
@@ -47,92 +43,47 @@ void PatchHudStrings(void){
 
 	HANDLE hModule = SearchForHandle( "hud.dll" );
 	if(hModule == INVALID_HANDLE_VALUE){
-		printf("\nERROR: Unable to get handle to hud.dll\n");
+		RGLPrint("HUD", "ERROR: Unable to get handle to hud.dll\n");
 	}
 
 	VOID* pSectionData;
 	DWORD dwSectionSize;
 	if( !XGetModuleSection(hModule ,"hud", &pSectionData, &dwSectionSize ) ){
-		printf("\nERROR: Unable to get module section data from hud.dll\n");
+		RGLPrint("HUD", "ERROR: Unable to get module section data from hud.dll\n");
 	}
 
-	HUDOffsets* offsets = offsetmanager.GetHUDOffsets();
+	// HUDOffsets* offsets = offsetmanager.GetHUDOffsets();
 
-	if(offsets)
-	{
-		ReplaceHudString(HUD_FamilySettings_String, (DWORD)pSectionData + offsets->FamilySettings_Str1, HUD_FamilySettings_Len);
-		ReplaceHudString(HUD_FamilySettings_String, (DWORD)pSectionData + offsets->FamilySettings_Str2, HUD_FamilySettings_Len);
-	}
+	if(!RGLoader->Offsets->HUD)
+		return;
+
+	ReplaceHudString(HUD_FamilySettings_String, (DWORD)pSectionData + RGLoader->Offsets->HUD->FamilySettings_Str1, HUD_FamilySettings_Len);
+	ReplaceHudString(HUD_FamilySettings_String, (DWORD)pSectionData + RGLoader->Offsets->HUD->FamilySettings_Str2, HUD_FamilySettings_Len);
 }
-
-
-DWORD HudBootToDashHelperHook(DWORD* _XUIOBJ, _XDASHLAUNCHDATA* LaunchData , DWORD* cstr, DWORD* r6, DWORD* r7){
-	/*printf("\n\n ***RGLoader.xex*** \n");
-	printf("  -LaunchData- \n");
-    printf("      dwVersion: 0x%X\n", LaunchData->dwVersion);
-	printf("      dwCommand: 0x%X\n", LaunchData->dwCommand);
-	printf("      dwUserIndex: 0x%X\n", LaunchData->dwUserIndex);*/
-
-	HUDOffsets* offsets = offsetmanager.GetHUDOffsets();
-	if(!offsets)
-		return -1;
-
-	if(LaunchData->dwCommand == (DWORD)offsets->LaunchData_FamilySettings){
-		printf("\n[RGLOADER]: Jumping back to xshell!\n");
-		//printf("[RGLOADER]: System thread, attempting to launch xshell.\n");
-		XSetLaunchData( NULL, 0 );
-
-		//XamLoaderLaunchTitleEx("\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector\\DashSelector.xex", "\\Device\\Harddisk0\\Partition1\\DEVKIT\\Utilities\\DashSelector", NULL, 0);
-		XamLoaderLaunchTitleEx("\\SystemRoot\\xshell.xex", "\\SystemRoot", NULL, 0);
-		//close HUD menu
-		setmemdm((DWORD)((unsigned long)0x60 + (unsigned long)r7), 0);
-		setmemdm((DWORD)((unsigned long)0x5C + (unsigned long)r7), 0);
-		return 0;
-	}
-	else {
-		
-		return ((HUD_BOOTTODASHHELPER)offsets->BootToDashHelper_Func)(_XUIOBJ, LaunchData , cstr, r6,  r7);
-	}
-}
-
-
 
 BOOL HudPatchInJump(DWORD destination, BOOL linked=false){
 
-	HUDOffsets* offsets = offsetmanager.GetHUDOffsets();
-	if(!offsets)
+	if(!RGLoader->Offsets->HUD)
 		return -1;
 
-	setmemdm( offsets->BootToDashHelper_Jump, MakeBranch( offsets->BootToDashHelper_Jump, (offsets->FamilySettings_LaunchStr)+0x4, true));
+	setmemdm(RGLoader->Offsets->HUD->BootToDashHelper_Jump, MakeBranch(RGLoader->Offsets->HUD->BootToDashHelper_Jump, (RGLoader->Offsets->HUD->FamilySettings_LaunchStr)+0x4, true));
 	//setmem( HUD_BootToDashHelper_Jump, 0x60000000);
 
 	//setmem(HUD_FamilySettings_LaunchStr, 0x4800001C);
-	setmemdm( offsets->FamilySettings_LaunchStr, 0x4E800020); //blr
+	setmemdm(RGLoader->Offsets->HUD->FamilySettings_LaunchStr, 0x4E800020); //blr
 	BYTE data[0x10];
 	PatchInJump((PDWORD)data, (DWORD)destination, linked);
 	HRESULT hr;
-	hr = (HRESULT)memcpy((PDWORD)((offsets->FamilySettings_LaunchStr)+4), (LPCVOID)data, 0x10);
+	hr = (HRESULT)memcpy((PDWORD)((RGLoader->Offsets->HUD->FamilySettings_LaunchStr)+4), (LPCVOID)data, 0x10);
 	//return hr;
 	return 1;
 }
 
 
 int PatchHudReturnToXShell(){
-	
 	char* newLabel = "RGLoader\0\0";
-
-	//rename labels
-	//DmSetMemory((LPVOID)0x914142C0, (DWORD)9, newLabel, 0);//14719 str1
-	//DmSetMemory((LPVOID)0x91414311, (DWORD)9, newLabel, 0);//14719 str2
-	//DmSetMemory((LPVOID)0x914145E7, (DWORD)9, newLabel, 0);//14719 str3
-	//DmSetMemory((LPVOID)0x91414638, (DWORD)9, newLabel, 0);//14719 str4
-	
 	HudPatchInJump((DWORD)HudBootToDashHelperHook);
 	PatchHudStrings();
-
-
-	//patch_unhook_xexload();
-
 	
 	return 1;
 }

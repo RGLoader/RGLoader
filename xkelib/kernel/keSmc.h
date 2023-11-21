@@ -1,6 +1,38 @@
 #ifndef __KESMC_H
 #define __KESMC_H
 
+// for HalRegisterSMCNotification
+// messageCode 0x83 notifies of PayloadAsUCHARs[0]
+// 0x23 - IR event (priority 0 only?)
+// 0x60/0x66 - tray events
+// 0x70 thermal shutdown event
+
+typedef struct _HAL_SMC_REGISTRATION { 
+	void* NotificationRoutine; // 0x0 sz:0x4 function: void Notify(PHAL_SMC_REGISTRATION SMCRegistration, PSMC_MAILBOX_MESSAGE NotificationMessage);
+	long Priority; // 0x4 sz:0x4
+	LIST_ENTRY ListEntry; // 0x8 sz:0x8
+} HAL_SMC_REGISTRATION, *PHAL_SMC_REGISTRATION; // size 16
+C_ASSERT(sizeof(HAL_SMC_REGISTRATION) == 0x10);
+
+typedef struct _SMC_MAILBOX_MESSAGE { 
+	BYTE MessageCode; // 0x0 sz:0x1
+	BYTE PayloadAsUCHARs[0xF]; // 0x1 sz:0xF
+} SMC_MAILBOX_MESSAGE, *PSMC_MAILBOX_MESSAGE; // size 16
+C_ASSERT(sizeof(SMC_MAILBOX_MESSAGE) == 0x10);
+
+typedef VOID (*SMCNOTIFYROUTINE)(PHAL_SMC_REGISTRATION SMCRegistration, PSMC_MAILBOX_MESSAGE NotificationMessage);
+
+// result from using smc_query_tray or HalRegisterSMCNotification's PayloadAsUCHARs[0]
+typedef enum _SMC_TRAY_STATE {
+	SMC_TRAY_OPEN = 0x60,
+	SMC_TRAY_OPEN_REQUEST = 0x61,
+	SMC_TRAY_CLOSE = 0x62,
+	SMC_TRAY_OPENING = 0x63,
+	SMC_TRAY_CLOSING = 0x64,
+	SMC_TRAY_UNKNOWN = 0x65,
+	SMC_TRAY_SPINUP = 0x66,
+} SMC_TRAY_STATE;
+
 typedef enum SMC_CMD{
 	smc_poweron_type = 0x1,
 	smc_query_rtc = 0x4,

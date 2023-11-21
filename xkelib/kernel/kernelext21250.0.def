@@ -312,12 +312,12 @@ EXPORTS
 ;	RtlRaiseException @310
 ;	RtlRaiseStatus @311
 ;	RtlRip @312
-	_scprintf @313
-	_snprintf @314
-;	sprintf @315
-	_scwprintf @316
-	_snwprintf @317
-	_swprintf @318
+;	_scprintf @313		; lib name: RtlScprintf
+;	_snprintf @314		; lib name: RtlSnprintf
+;	sprintf @315		; lib name: RtlSprintf
+;	_scwprintf @316		; lib name: RtlScwprintf
+;	_snwprintf @317		; lib name: RtlSnwprintf
+;	_swprintf @318		; lib name: RtlSwprintf
 ;	RtlTimeFieldsToTime @319
 ;	RtlTimeToTimeFields @320
 ;	RtlTryEnterCriticalSection @321
@@ -331,16 +331,16 @@ EXPORTS
 ;	RtlUpcaseUnicodeChar @329
 ;	RtlUpperChar @330
 ;	RtlVirtualUnwind @331
-;	_vscprintf @332
-	_vsnprintf @333
-;	vsprintf @334
-;	_vscwprintf @335
-	_vsnwprintf @336
-	_vswprintf @337
-	KeTlsAlloc @338
-	KeTlsFree @339
-	KeTlsGetValue @340
-	KeTlsSetValue @341
+;	_vscprintf @332		; lib name: RtlVscprintf
+;	_vsnprintf @333		; lib name: RtlVsnprintf
+;	vsprintf @334		; lib name: RtlVsprintf
+;	_vscwprintf @335	; lib name: RtlVscwprintf
+;	_vsnwprintf @336	; lib name: RtlVsnwprintf
+;	_vswprintf @337		; lib name: RtlVswprintf
+	KeTlsAlloc @338		; lib name: TlsAlloc
+	KeTlsFree @339		; lib name: TlsFree
+	KeTlsGetValue @340	; lib name: TlsGetValue
+	KeTlsSetValue @341	; lib name: TlsSetValue
 ;	XboxHardwareInfo @342
 ;	XboxKrnlBaseVersion @343
 ;	XboxKrnlVersion @344

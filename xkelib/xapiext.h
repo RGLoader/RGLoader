@@ -7,31 +7,6 @@
 extern "C" {
 #endif
 
-	VOID
-	RtlSnprintf(
-		CHAR * Buffer,
-		DWORD MaxLength,
-		LPCSTR Format,
-		...
-	);
-	
-	// untested
-	VOID
-	RtlSwprintf(
-		WCHAR * Buffer,
-		DWORD MaxLength,
-		LPCWSTR Format,
-		...
-	);
-	
-	VOID
-	RtlSnwprintf(
-		WCHAR * Buffer,
-		DWORD MaxLength,
-		LPCWSTR Format,
-		...
-	);	
-
 	// SDK library function
 	VOID XapiThreadStartup(
 		IN		VOID (__cdecl *StartRoutine)(VOID *),
@@ -53,16 +28,15 @@ extern "C" {
 
 	// SDK library function? sdk links it directly to XamLoaderGetGameInfo @427
 	// UNTESTED!!!
-	HRESULT
-	XamGetGameInfo(
+	HRESULT XamGetGameInfo(
 		LPCWSTR wszTitleName,
 		DWORD dwTitleId,
 		PBYTE* ppbUnk,
 		QWORD* pqwUnk
 	);
+	
 	// SDK library function?
-	DWORD
-	XContentCreateDeviceEnumerator(
+	DWORD XContentCreateDeviceEnumerator(
 		DWORD dwContentTypes,
 		DWORD dwFlags,
 		DWORD cItem,
@@ -72,27 +46,33 @@ extern "C" {
 
 	// disc format function for fatx found in xapilib.lib
 	// ie "\\Device\\SomeDevice", use RtlInitAnsiString and modify ??((Length+0x10000) - 1)??
-	NTSTATUS
-	XapiFormatFATVolume(
+	NTSTATUS XapiFormatFATVolume(
 		PANSI_STRING deviceName
 	);
 	
-	NTSTATUS
-	XapiFormatFATVolumeEx(
+	NTSTATUS XapiFormatFATVolumeEx(
 		PANSI_STRING deviceName,
 		DWORD sectorSize
 	);
 	
 	// disc format functions for fat32 found in xapilib.lib
-	NTSTATUS
-	XapiFormatFATWVolume(
+	NTSTATUS XapiFormatFATWVolume(
 		LPCSTR devicename
 	);
 	
-	NTSTATUS
-	XapiFormatFATWVolumeByHandle(
+	NTSTATUS XapiFormatFATWVolumeByHandle(
 		HANDLE deviceHandle
 	);
+
+	//NTSYSAPI
+	//EXPORTNUM(xxx) // not exported, might be in sdk though
+	//NTSTATUS
+	//NTAPI
+	//NtWaitForSingleObject(
+	//	IN		HANDLE Handle,
+	//	IN		BOOLEAN Alertable,
+	//	IN		PLARGE_INTEGER Timeout
+	//);	
 
 #ifdef __cplusplus
 }
