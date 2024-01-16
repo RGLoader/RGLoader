@@ -110,6 +110,9 @@ HRESULT XexStartExecutableHook(FARPROC TitleProcessInitThreadProc) {
 	PLDR_DATA_TABLE_ENTRY pDTE = (PLDR_DATA_TABLE_ENTRY)*XexExecutableModuleHandle;
 	XEX_EXECUTION_ID* pExeId = (XEX_EXECUTION_ID*)RtlImageXexHeaderField(pDTE->XexHeaderBase, XEX_HEADER_EXECUTION_ID);
 
+	if (!pExeId)
+		return res;
+
 	CHAR szTitlePluginPath0[MAX_PATH] = { 0 };
 	CHAR szTitlePluginPattern[MAX_PATH] = { 0 };
 	CHAR szTitlePluginPath1[MAX_PATH] = { 0 };
