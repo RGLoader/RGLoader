@@ -2,8 +2,9 @@
 
 Globals* RGLoader;
 
-Globals::Globals() {
+Globals::Globals(HANDLE hModule) {
 	this->State = new SState();
+	this->State->Handle = hModule;
 	this->Config = PopulateConfig();
 	this->Offsets = PopulateOffsets();
 }

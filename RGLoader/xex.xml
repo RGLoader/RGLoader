@@ -19,8 +19,8 @@
      
 	<baseaddr addr="0x91800000"/>
 
-	<section file="Z:\Programming\Projects\Python\Xbox 360 Crypto\Output\Compiled\Generic\SpoofyTest_signed.bin" name="52474C00" memory="RO" />
-	<section file="Z:\Programming\Projects\Python\Xbox 360 Crypto\Output\Compiled\xbOnline\SpoofyTest_signed.bin" name="52474C01" memory="RO" />
+	<section file="Z:\Programming\Projects\Python\Xbox 360 Crypto\Output\Compiled\Generic\Spoofy_signed.bin" name="52474C00" memory="RO" />
+	<section file="Z:\Programming\Projects\Python\Xbox 360 Crypto\Output\Compiled\xbOnline\Spoofy_signed.bin" name="52474C01" memory="RO" />
 	<section file="Z:\Programming\Projects\Python\Xbox 360 Crypto\Output\Compiled\Patches\SpoofySC0_dev.bin" name="52474C02" memory="RO" />
 	<section file="X:\Xbox 360\XDK\rgloader_default.ini" name="52474C03" memory="RO" />
 

@@ -328,8 +328,7 @@ BOOL APIENTRY DllMain(HANDLE hModule, DWORD dwReason, LPVOID lpReserved) {
 			MountStuff();
 
 			// Initialize globals
-			RGLoader = new Globals();
-			RGLoader->State->Handle = hModule;
+			RGLoader = new Globals(hModule);
 
 			HANDLE hThread; DWORD hThreadID;
 			ExCreateThread(&hThread, 32 * 1024, &hThreadID, (PVOID)XapiThreadStartup, (LPTHREAD_START_ROUTINE)Initialize, NULL, 0x1C000427);

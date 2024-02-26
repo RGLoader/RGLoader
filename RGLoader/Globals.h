@@ -2,7 +2,7 @@
 
 class Globals {
 public:
-	Globals();
+	Globals(HANDLE hModule);
 	~Globals();
 
 	PSState State;
